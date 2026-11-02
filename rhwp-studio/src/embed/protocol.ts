@@ -109,7 +109,8 @@ export function isUsableParentOrigin(origin: string): boolean {
   if (!origin || origin === 'null') return false;
   try {
     const protocol = new URL(origin).protocol;
-    return protocol === 'http:' || protocol === 'https:';
+    // tauri: = Tauri webview custom scheme on macOS/Linux (tauri://localhost).
+    return protocol === 'http:' || protocol === 'https:' || protocol === 'tauri:';
   } catch {
     return false;
   }

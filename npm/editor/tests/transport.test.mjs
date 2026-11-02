@@ -463,3 +463,10 @@ test('EditorTransport는 동기 postMessage 실패 시 pending과 timer를 정�
     transport.destroy();
   }
 });
+
+test('EditorTransport는 tauri: studioUrl을 tauri://host origin으로 보낸다', () => {
+  const fakeWindow = { addEventListener() {}, removeEventListener() {} };
+  const transport = new EditorTransport({ contentWindow: {} }, 'tauri://localhost/apps/hdocs/studio/index.html', { window: fakeWindow });
+  assert.equal(transport._targetOrigin, 'tauri://localhost');
+  assert.throws(() => new EditorTransport({ contentWindow: {} }, 'file:///studio/index.html', { window: fakeWindow }), /studioUrl must use/);
+});

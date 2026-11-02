@@ -71,6 +71,8 @@ test('embed protocol은 capability를 포함한 v1 connect와 session-bound requ
   }, 's-1'), false);
   assert.equal(isUsableParentOrigin('https://host.example'), true);
   assert.equal(isUsableParentOrigin('null'), false);
+  assert.equal(isUsableParentOrigin('tauri://localhost'), true);
+  assert.equal(isUsableParentOrigin('file://'), false);
 });
 
 test('embed router는 binary load와 unknown method를 공개 동작으로 처리한다', async () => {

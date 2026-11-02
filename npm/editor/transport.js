@@ -68,10 +68,12 @@ export class EditorTransport {
   constructor(iframe, studioUrl, options = {}) {
     this._iframe = iframe;
     const targetUrl = new URL(studioUrl, globalThis.location?.href);
-    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
-      throw new Error('studioUrl must use HTTP(S)');
+    if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:'
+        && targetUrl.protocol !== 'tauri:') {
+      throw new Error('studioUrl must use HTTP(S) or tauri:');
     }
-    this._targetOrigin = targetUrl.origin;
+    // tauri: (macOS/Linux Tauri webview) is a non-special scheme, so URL.origin can be 'null'.
+    this._targetOrigin = targetUrl.protocol === 'tauri:' ? `tauri://${targetUrl.host}` : targetUrl.origin;
     this._window = options.window || window;
     this._requestTimeoutMs = options.requestTimeoutMs;
     this._handshakeTimeoutMs = options.handshakeTimeoutMs ?? 1000;
