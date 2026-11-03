@@ -70,6 +70,66 @@ export interface EmbedRpcHandlers {
   pluginInvoke(id: string, method: string, args: unknown[]): Promise<unknown>;
   chromeGet(): Promise<unknown>;
   chromeSet(next: Record<string, unknown>): Promise<unknown>;
+
+  // ── 글꼴 (호스트 글꼴 선택기) ────────────────────────────
+  // 문서 글꼴은 DocInfo 글꼴 표(getDocumentInfo().fontsUsed)에서 읽는다 — 본문 run 을 훑지 않는다.
+  fontsDocument(): Promise<EmbedDocumentFontsV1>;
+  fontsStatus(names: string[]): Promise<EmbedFontStatusV1[]>;
+  fontsActivate(name: string): Promise<EmbedFontActivationV1>;
+  fontsCurrent(): Promise<{ fontName: string | null }>;
+  fontsApply(name: string): Promise<{ ok: boolean; activation: EmbedFontActivationV1 }>;
+}
+
+export type EmbedWebFontSupplyV1 = 'loaded' | 'registered' | 'catalogued' | 'absent';
+
+export interface EmbedDocumentFontV1 {
+  fontName: string;
+  /** studio 판단: available | needs-local-check | web-substitute | missing */
+  status: string;
+  source: string;
+  /** 지금 화면에 대신 쓰는 글꼴(없으면 null) */
+  substituteFont: string | null;
+  webSupply: EmbedWebFontSupplyV1;
+  /** 이 이름에 등록된 웹 글꼴 파일(예: 'fonts/NotoSerifKR-Regular.woff2'). 상용 글꼴 이름에 오픈 글꼴 파일을
+   *  대역으로 붙인 항목이 있으므로 호스트는 파일의 실제 글꼴과 이름을 비교해 "대체 중"을 가린다 */
+  webSupplyFile: string | null;
+}
+
+export interface EmbedDocumentFontsV1 {
+  fonts: EmbedDocumentFontV1[];
+  /** 엔진 기본 대체 글꼴 */
+  fallbackFont: string | null;
+  localSupported: boolean;
+  localSnapshotStored: boolean;
+}
+
+export interface EmbedFontStatusV1 {
+  name: string;
+  webSupply: EmbedWebFontSupplyV1;
+  /** true = OS 설치 확인, false = 확인 안 됨(없다는 뜻이 아님) */
+  local: boolean;
+  webSupplyFile: string | null;
+}
+
+export interface EmbedFontActivationV1 {
+  ok: boolean;
+  /** loaded: 웹 글꼴 적재 확인 · local: OS 글꼴로 이미 사용 가능 · not-supplied: 공급 경로 없음 · failed: 적재 실패 */
+  result: 'loaded' | 'local' | 'not-supplied' | 'failed';
+  webSupply: EmbedWebFontSupplyV1;
+}
+
+function asFontName(value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0 || value.length > 256) {
+    throw new Error('name must be a non-empty string (max 256)');
+  }
+  return value.trim();
+}
+
+function asFontNames(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > 512) {
+    throw new Error('names must be an array of at most 512 font names');
+  }
+  return value.map(asFontName);
 }
 
 export interface EmbedRendererDiagnosticsV1 {
@@ -205,6 +265,11 @@ export async function routeEmbedRequest(
     );
     case 'chrome.get': return handlers.chromeGet();
     case 'chrome.set': return handlers.chromeSet(asParams(params.visibility));
+    case 'fonts.document': return handlers.fontsDocument();
+    case 'fonts.status': return handlers.fontsStatus(asFontNames(params.names));
+    case 'fonts.activate': return handlers.fontsActivate(asFontName(params.name));
+    case 'fonts.current': return handlers.fontsCurrent();
+    case 'fonts.apply': return handlers.fontsApply(asFontName(params.name));
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

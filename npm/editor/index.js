@@ -445,6 +445,23 @@ export class RhwpEditor {
     };
   }
 
+  /**
+   * 글꼴 — 호스트가 자기 글꼴 선택기를 그릴 때 씁니다.
+   *
+   * `document()` 는 문서 글꼴 표(DocInfo)만 읽습니다(본문 순회 없음). `activate()` 는 studio 에 번들된
+   * 웹 글꼴을 적재하고 실제 적재를 확인한 뒤에만 `ok` 입니다. `apply()` 는 선택 영역(또는 캐럿 대기 서식)에
+   * 글꼴을 적용합니다.
+   */
+  get fonts() {
+    return {
+      document: () => this._request('fonts.document'),
+      status: (names) => this._request('fonts.status', { names }),
+      activate: (name) => this._request('fonts.activate', { name }),
+      current: () => this._request('fonts.current'),
+      apply: (name) => this._request('fonts.apply', { name }),
+    };
+  }
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 그대로 실행됩니다. */
   get chrome() {
     return {

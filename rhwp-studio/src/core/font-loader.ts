@@ -224,6 +224,41 @@ function detectOSFonts(fontNames: readonly string[]): void {
   }
 }
 
+const probedSystemFontFamilies = new Map<string, boolean>();
+
+/**
+ * 호스트 글꼴 선택기용 OS 설치 탐지. 이름마다 한 번만 측정하고 결과를 캐시한다.
+ * 웹 face 가 이미 등록된 이름은 측정이 그 face 로 오염되므로 건너뛴다(웹 공급 상태로 판단).
+ * 폭 비교는 "설치됨"만 확정할 수 있다 — 감지 안 됨은 "없음"이 아니라 "확인 안 됨"이다.
+ */
+export function probeSystemFonts(fontNames: readonly string[]): string[] {
+  const found: string[] = [];
+  for (const name of fontNames) {
+    const normalized = normalizeFontFamily(name);
+    if (!normalized) continue;
+    if (detectedOSFontFamilies.has(normalized)) {
+      found.push(name);
+      continue;
+    }
+    if (isRegisteredFontFamily(name)) continue;
+    let hit = probedSystemFontFamilies.get(normalized);
+    if (hit === undefined) {
+      try {
+        hit = isSystemFontAvailable(name);
+      } catch {
+        hit = false;
+      }
+      probedSystemFontFamilies.set(normalized, hit);
+      if (hit) {
+        detectedOSFonts.add(name);
+        detectedOSFontFamilies.add(normalized);
+      }
+    }
+    if (hit) found.push(name);
+  }
+  return found;
+}
+
 /** 감지된 OS 폰트 목록 (외부 참조용) */
 export function getDetectedOSFonts(): ReadonlySet<string> {
   return detectedOSFonts;

@@ -2,7 +2,7 @@ import { setHostFontProvider, onHostFontsChanged, hasHostFontProvider, prepareHo
 import { collectHostFontRequests } from '@/core/host-font-requests';
 import { WasmBridge } from '@/core/wasm-bridge';
 import { installDocumentTitle } from '@/ui/document-title';
-import type { DocumentInfo, PageInfo } from '@/core/types';
+import type { CharProperties, DocumentInfo, PageInfo } from '@/core/types';
 import { EventBus } from '@/core/event-bus';
 import { assertRemoteDocumentBytes } from '@/core/document-signature';
 import { CanvasView } from '@/view/canvas-view';
@@ -17,7 +17,7 @@ import {
   toolbarSplitItems,
 } from '@/ui/toolbar-split-menu';
 import { MenuBar } from '@/ui/menu-bar';
-import { loadWebFonts, resolveCanvasKitFontPlan } from '@/core/font-loader';
+import { getWebFontSupplySnapshot, loadWebFonts, probeSystemFonts, resolveCanvasKitFontPlan } from '@/core/font-loader';
 import { withCanvasKitSurfaceBlockers } from '@/core/canvaskit-document-preflight';
 import { loadExtensionViewerSettings, type ExtensionViewerSettings } from '@/core/extension-settings';
 import { CommandRegistry } from '@/command/registry';
@@ -63,6 +63,8 @@ import { DocumentDirtyState } from '@/core/document-dirty-state';
 import { initThemeSync, setThemeMode, getThemeMode, getEffectiveTheme } from '@/core/theme';
 import { maybeShowSkinOnboarding } from '@/ui/skin-onboarding-dialog';
 import { analyzeDocumentFonts } from '@/core/document-font-status';
+import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
+import { FONT_RULE_WEBFONT_ENTRIES } from '@/core/font-rule-runtime';
 import { setDocumentFontSubstitutions } from '@/core/font-substitution';
 import {
   clearStoredLocalFonts,
@@ -174,6 +176,45 @@ if (import.meta.env.DEV) {
   initRhwpDev(wasm);
 }
 let canvasView: CanvasView | null = null;
+/** 캐럿 위치 글자 서식의 글꼴 — 임베드 호스트 글꼴 선택기 표시용(cursor-format-changed 마지막 값) */
+let embedCaretFontName: string | null = null;
+eventBus.on('cursor-format-changed', (props) => {
+  embedCaretFontName = (props as CharProperties | undefined)?.fontFamily ?? null;
+});
+
+/**
+ * 임베드 호스트 글꼴 활성화: 번들 웹 글꼴을 적재하고 실제 적재를 확인한 뒤에만 ok.
+ * 적재되면 font-loader 의 FontFace 가 document.fonts 에 들어가 'loadingdone' 이 현재 view 를 다시 그린다
+ * (Canvas2D 측정 캐시 무효화 포함 — 기존 경로). OS 에 이미 있는 글꼴은 웹 적재 없이 local 로 본다.
+ */
+/** 이름에 등록된 웹 글꼴 파일(대역 판별용) */
+function embedWebSupplyFile(name: string): string | null {
+  return FONT_RULE_WEBFONT_ENTRIES.find(entry => entry.name === name)?.file ?? null;
+}
+
+async function activateEmbedFont(name: string): Promise<EmbedFontActivationV1> {
+  if (probeSystemFonts([name]).length > 0) {
+    return { ok: true, result: 'local', webSupply: getWebFontSupplySnapshot(name).status };
+  }
+  const before = getWebFontSupplySnapshot(name).status;
+  if (before === 'loaded') return { ok: true, result: 'loaded', webSupply: before };
+  if (before === 'absent') return { ok: false, result: 'not-supplied', webSupply: before };
+  try {
+    await loadWebFonts([name], undefined, extensionViewerSettings);
+  } catch (error) {
+    console.warn('[embed] font activation failed:', name, error);
+  }
+  const after = getWebFontSupplySnapshot(name).status;
+  if (after !== 'loaded') {
+    // 외부(CDN) 전용 항목은 RHWP_DISABLE_EXTERNAL_WEBFONTS 빌드에서 적재 대상이 아니다
+    return { ok: false, result: after === 'catalogued' ? 'not-supplied' : 'failed', webSupply: after };
+  }
+  if (canvasView && wasm.pageCount > 0) {
+    wasm.invalidateCanvasMetricFonts();
+    eventBus.emit('document-view-changed');
+  }
+  return { ok: true, result: 'loaded', webSupply: after };
+}
 let inputHandler: InputHandler | null = null;
 let documentAgent: DocumentAgentController | null = null;
 let toolbar: Toolbar | null = null;
@@ -2122,5 +2163,51 @@ installEmbedRuntime({
     async pluginInvoke(id, method, args) { await initPromise; return plugins.invoke(id, method, args); },
     async chromeGet() { return getChromeVisibility(); },
     async chromeSet(next) { return setChromeVisibility(next as Partial<ChromeVisibility>); },
+    async fontsDocument() {
+      await initPromise;
+      if (wasm.pageCount === 0) {
+        return { fonts: [], fallbackFont: null, localSupported: false, localSnapshotStored: false };
+      }
+      // DocInfo 글꼴 표만 읽는다(문서 본문 run 순회 없음). 편집 중 findOrCreateFontId 로 추가된 글꼴도 포함된다.
+      const info = wasm.getDocumentInfo();
+      const report = analyzeDocumentFonts(info.fontsUsed);
+      return {
+        fonts: report.fonts.map(font => ({
+          ...font,
+          webSupply: getWebFontSupplySnapshot(font.fontName).status,
+          webSupplyFile: embedWebSupplyFile(font.fontName),
+        })),
+        fallbackFont: (info as { fallbackFont?: string }).fallbackFont ?? null,
+        localSupported: report.localSupported,
+        localSnapshotStored: report.localSnapshotStored,
+      };
+    },
+    async fontsStatus(names) {
+      await initPromise;
+      const local = new Set(probeSystemFonts(names));
+      return names.map(name => ({
+        name,
+        webSupply: getWebFontSupplySnapshot(name).status,
+        local: local.has(name),
+        webSupplyFile: embedWebSupplyFile(name),
+      }));
+    },
+    async fontsActivate(name) {
+      await initPromise;
+      return activateEmbedFont(name);
+    },
+    async fontsCurrent() {
+      await initPromise;
+      return { fontName: embedCaretFontName };
+    },
+    async fontsApply(name) {
+      await initPromise;
+      // 적용 전에 글꼴을 적재해 둔다(실패해도 적용은 한다 — 문서 데이터는 이름이고 화면은 대체 글꼴로 그린다)
+      const activation = await activateEmbedFont(name);
+      const fontId = wasm.findOrCreateFontId(name);
+      if (fontId < 0) return { ok: false, activation };
+      eventBus.emit('format-char', { fontId } as CharProperties);
+      return { ok: true, activation };
+    },
   },
 });

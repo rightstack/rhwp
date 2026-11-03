@@ -13,6 +13,7 @@ const CAPABILITIES = [
 ];
 const LONG_RUNNING_METHODS = new Set([
   'loadFile', 'getFontDecisionTrace', 'exportHwp', 'exportHwpVerify', 'exportHwpx', 'exportHml',
+  'fonts.activate', 'fonts.apply',
 ]);
 
 export function requestTimeoutFor(method, configuredTimeout) {

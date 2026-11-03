@@ -361,6 +361,18 @@ export declare class RhwpEditor {
     redo(): Promise<CommandResult>;
   };
 
+  /** 글꼴 — 호스트 글꼴 선택기용. 문서 글꼴은 DocInfo 글꼴 표에서 읽는다(본문 순회 없음) */
+  readonly fonts: {
+    document(): Promise<RhwpDocumentFonts>;
+    status(names: string[]): Promise<RhwpFontStatus[]>;
+    /** 번들 웹 글꼴 적재. 적재를 확인한 뒤에만 ok */
+    activate(name: string): Promise<RhwpFontActivation>;
+    /** 캐럿 위치 글자의 글꼴 */
+    current(): Promise<{ fontName: string | null }>;
+    /** 선택 영역(없으면 캐럿 대기 서식)에 적용. 적용 전에 activate 를 시도한다 */
+    apply(name: string): Promise<{ ok: boolean; activation: RhwpFontActivation }>;
+  };
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 실행된다 */
   readonly chrome: {
     get(): Promise<ChromeVisibility>;
@@ -396,6 +408,41 @@ export interface MenuNode {
 export type CommandResult =
   | { ok: true }
   | { ok: false; reason: string; message?: string };
+
+export type RhwpWebFontSupply = 'loaded' | 'registered' | 'catalogued' | 'absent';
+
+export interface RhwpDocumentFont {
+  fontName: string;
+  /** available | needs-local-check | web-substitute | missing */
+  status: string;
+  source: string;
+  /** 지금 화면에 대신 쓰는 글꼴 */
+  substituteFont: string | null;
+  webSupply: RhwpWebFontSupply;
+  /** 이 이름에 등록된 웹 글꼴 파일. 상용 글꼴 이름에 오픈 글꼴 파일을 대역으로 붙인 경우가 있다 */
+  webSupplyFile: string | null;
+}
+
+export interface RhwpDocumentFonts {
+  fonts: RhwpDocumentFont[];
+  fallbackFont: string | null;
+  localSupported: boolean;
+  localSnapshotStored: boolean;
+}
+
+export interface RhwpFontStatus {
+  name: string;
+  webSupply: RhwpWebFontSupply;
+  /** true = OS 설치 확인. false 는 "확인 안 됨"(없다는 뜻이 아님) */
+  local: boolean;
+  webSupplyFile: string | null;
+}
+
+export interface RhwpFontActivation {
+  ok: boolean;
+  result: 'loaded' | 'local' | 'not-supplied' | 'failed';
+  webSupply: RhwpWebFontSupply;
+}
 
 export interface ChromeVisibility {
   menu: boolean;

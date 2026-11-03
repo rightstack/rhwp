@@ -1153,3 +1153,46 @@ test('embed router는 notifySaved fileName을 정규화해 핸들러로 전달�
 
   assert.deepEqual(received, [undefined, 'a.hwp', undefined, undefined]);
 });
+
+test('[lily] embed router는 글꼴 RPC 인자를 검증해 핸들러로 넘긴다', async () => {
+  const calls: unknown[] = [];
+  const activation = { ok: true, result: 'loaded' as const, webSupply: 'loaded' as const };
+  const handlers = {
+    fontsDocument: async () => ({ fonts: [], fallbackFont: null, localSupported: false, localSnapshotStored: false }),
+    fontsStatus: async (names: string[]) => { calls.push(['status', names]); return []; },
+    fontsActivate: async (name: string) => { calls.push(['activate', name]); return activation; },
+    fontsCurrent: async () => ({ fontName: '함초롬바탕' }),
+    fontsApply: async (name: string) => { calls.push(['apply', name]); return { ok: true, activation }; },
+  } as unknown as EmbedRpcHandlers;
+
+  assert.deepEqual(await routeEmbedRequest('fonts.document', {}, handlers), {
+    fonts: [], fallbackFont: null, localSupported: false, localSnapshotStored: false,
+  });
+  await routeEmbedRequest('fonts.status', { names: ['Noto Sans KR', ' 바탕 '] }, handlers);
+  await routeEmbedRequest('fonts.activate', { name: 'Noto Serif KR' }, handlers);
+  await routeEmbedRequest('fonts.apply', { name: 'Pretendard' }, handlers);
+  assert.deepEqual(await routeEmbedRequest('fonts.current', {}, handlers), { fontName: '함초롬바탕' });
+  assert.deepEqual(calls, [
+    ['status', ['Noto Sans KR', '바탕']],
+    ['activate', 'Noto Serif KR'],
+    ['apply', 'Pretendard'],
+  ]);
+  for (const [method, params] of [
+    ['fonts.activate', {}],
+    ['fonts.activate', { name: '   ' }],
+    ['fonts.apply', { name: 3 }],
+    ['fonts.status', { names: 'Noto Sans KR' }],
+    ['fonts.status', { names: [''] }],
+    ['fonts.status', { names: new Array(513).fill('a') }],
+  ] as const) {
+    await assert.rejects(() => routeEmbedRequest(method, params, handlers), /name must|names must/);
+  }
+});
+
+test('[lily] fonts.document는 DocInfo 글꼴 표(getDocumentInfo)만 읽는다 — 본문 순회 없음', () => {
+  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const body = source.match(/async fontsDocument\(\) \{([\s\S]*?)\n    \},/)?.[1] ?? '';
+  assert.match(body, /wasm\.getDocumentInfo\(\)/);
+  assert.match(body, /analyzeDocumentFonts\(info\.fontsUsed\)/);
+  assert.doesNotMatch(body, /getParagraph|getTextRuns|getPageSvg|renderPage|sectionCount/);
+});
