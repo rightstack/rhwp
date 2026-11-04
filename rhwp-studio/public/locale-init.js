@@ -8,7 +8,7 @@
 // 결정 순서는 resolve.ts 와 같아야 한다: ?lang= → localStorage('rhwp-locale') → ko.
 // 브라우저 언어는 여기서도 보지 않는다(resolve.ts 의 이유 참고).
 (() => {
-  const supported = ['ko', 'en'];
+  const supported = ['ko', 'en', 'ja'];
   const normalize = (value) => {
     if (!value) return null;
     const base = String(value).trim().toLowerCase().split(/[-_]/)[0];

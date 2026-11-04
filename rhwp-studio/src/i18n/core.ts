@@ -12,12 +12,12 @@
 export type Catalog = Readonly<Record<string, string>>;
 
 /** 지원 로케일. 늘어나면 여기에 추가한다. */
-export type Locale = 'ko' | 'en';
+export type Locale = 'ko' | 'en' | 'ja';
 
 /** 최종 기본값. 원문 로케일이기도 하다. */
 export const DEFAULT_LOCALE: Locale = 'ko';
 
-const SUPPORTED: readonly Locale[] = ['ko', 'en'];
+const SUPPORTED: readonly Locale[] = ['ko', 'en', 'ja'];
 
 /**
  * 문자열 파라미터. 이름 자리표시자 `{name}` 으로 치환한다.

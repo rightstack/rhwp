@@ -86,7 +86,8 @@ test('언어 태그를 지원 로케일로 좁힌다', () => {
   assert.equal(normalizeLocale('ko-KR'), 'ko');
   assert.equal(normalizeLocale('EN'), 'en');
   assert.equal(normalizeLocale('ko_KR'), 'ko');
-  assert.equal(normalizeLocale('ja'), null);
+  assert.equal(normalizeLocale('ja-JP'), 'ja');
+  assert.equal(normalizeLocale('fr'), null);
   assert.equal(normalizeLocale(''), null);
   assert.equal(normalizeLocale(null), null);
 });
@@ -94,7 +95,8 @@ test('언어 태그를 지원 로케일로 좁힌다', () => {
 test('지원 로케일 판정', () => {
   assert.ok(isSupportedLocale('ko'));
   assert.ok(isSupportedLocale('en'));
-  assert.ok(!isSupportedLocale('ja'));
+  assert.ok(isSupportedLocale('ja'));
+  assert.ok(!isSupportedLocale('fr'));
   assert.ok(!isSupportedLocale(42));
 });
 

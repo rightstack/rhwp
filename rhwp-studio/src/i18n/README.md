@@ -12,6 +12,7 @@ src/i18n/
   index.ts           진입점. 카탈로그 등록·로케일 결정은 이 모듈을 읽는 순간 끝난다
   locales/ko.ts      원문 카탈로그 (생성물)
   locales/en.ts      영어 카탈로그 (생성물)
+  locales/ja.ts      일본어 카탈로그 (LilyOffice 포크 추가, 원어민 검수 전 초안)
 ```
 
 ## 로케일은 왜 브라우저 언어를 따르지 않나

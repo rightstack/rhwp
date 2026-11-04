@@ -10,6 +10,7 @@
 
 import koCatalog from './locales/ko.ts';
 import enCatalog from './locales/en.ts';
+import jaCatalog from './locales/ja.ts';
 import { getLocale, registerCatalog, setLocale, type Locale } from './core.ts';
 import { applyI18nToDom } from './dom.ts';
 import { collectBrowserSources, resolveLocale, storeLocale } from './resolve.ts';
@@ -37,6 +38,7 @@ export { LOCALE_QUERY_PARAM, resolveLocale } from './resolve.ts';
 // 초기화 여부와 무관하게 언제나 살아 있어야 한다.
 registerCatalog('ko', koCatalog as Record<string, string>);
 registerCatalog('en', enCatalog as Record<string, string>);
+registerCatalog('ja', jaCatalog as Record<string, string>);
 
 // 로케일도 이 시점에 정한다.
 //

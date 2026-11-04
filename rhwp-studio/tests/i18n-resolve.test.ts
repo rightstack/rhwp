@@ -31,9 +31,9 @@ test('아무 단서가 없으면 ko 로 떨어진다', () => {
 });
 
 test('지원하지 않는 값은 무시하고 다음 단계로 넘어간다', () => {
-  assert.equal(resolveLocale({ search: '?lang=ja', stored: 'en', navigator: 'ko' }), 'en');
+  assert.equal(resolveLocale({ search: '?lang=fr', stored: 'en', navigator: 'ko' }), 'en');
   assert.equal(
-    resolveLocale({ search: '?lang=ja', stored: 'zz', navigator: 'ja-JP', preferBrowserLanguage: true }),
+    resolveLocale({ search: '?lang=fr', stored: 'zz', navigator: 'fr-FR', preferBrowserLanguage: true }),
     'ko',
   );
 });
