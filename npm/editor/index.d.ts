@@ -394,6 +394,12 @@ export declare class RhwpEditor {
     edit(memoIndex: number, text: string): Promise<{ ok: boolean }>;
   };
 
+  /** 본문 위치에 글 넣기(`\n` = 문단 나누기, 실행 취소 한 단계). 좌표가 본문 문단 밖이면 ok: false.
+   *  돌려주는 위치 = 넣은 글 바로 뒤 */
+  insertText(position: { section: number; paragraph: number; offset: number; text: string }): Promise<{
+    ok: boolean; section?: number; paragraph?: number; offset?: number; paragraphsAdded?: number;
+  }>;
+
   /** 상태 표시줄 값 */
   readonly status: {
     /** 캐럿의 단·줄(쪽 안 줄 번호)·칸, 모두 1부터. 본문 문단이 아니면(표·머리말·각주 안) null */

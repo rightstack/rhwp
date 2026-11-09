@@ -23,6 +23,7 @@ import {
   type EmbedParaFormatV1,
 } from './format-bridge.ts';
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
+import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
 import type {
   CanvasKitRenderModeRequest,
   CanvasKitSurfaceRequest,
@@ -107,6 +108,9 @@ export interface EmbedRpcHandlers {
   memoInsert(req: EmbedMemoInsertV1): Promise<{ ok: boolean; memoIndex?: number }>;
   /** 메모 번호로 글 바꾸기 */
   memoEdit(req: EmbedMemoEditV1): Promise<{ ok: boolean }>;
+
+  // ── [lily] 본문 위치에 글 넣기(줄바꿈 = 문단 나누기, 실행 취소 한 단계) ──
+  textInsert(req: EmbedTextInsertV1): Promise<EmbedTextInsertResultV1>;
 }
 
 /** 본문 문단 안 [start, end) 글자(문단 오프셋) */
@@ -336,6 +340,9 @@ export async function routeEmbedRequest(
     case 'memo.edit':
       assertOnlyKeys(params, ['memoIndex', 'text'], 'memo.edit params');
       return handlers.memoEdit(parseMemoEdit(params));
+    case 'text.insert':
+      assertOnlyKeys(params, ['section', 'paragraph', 'offset', 'text'], 'text.insert params');
+      return handlers.textInsert(parseTextInsert(params));
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

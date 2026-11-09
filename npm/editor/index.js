@@ -502,6 +502,14 @@ export class RhwpEditor {
     };
   }
 
+  /**
+   * 본문 위치(구역·문단·글자 오프셋)에 글을 넣습니다. `\n` 마다 문단을 나눕니다. 실행 취소 한 단계입니다.
+   * 좌표가 본문 문단 밖이면 `{ ok: false }`.
+   */
+  insertText(position) {
+    return this._request('text.insert', position);
+  }
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 그대로 실행됩니다. */
   get chrome() {
     return {
