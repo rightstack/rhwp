@@ -2371,6 +2371,210 @@ impl DocumentCore {
         }
         max_id.saturating_add(1).max(1)
     }
+
+    /// [lily] 본문 문단의 `char_offset` 에 메모(빈 범위 메모 필드)를 넣는다.
+    ///
+    /// 메모 본문은 `memo_paragraphs`(줄바꿈마다 문단 하나), 작성자는 한컴 실측 command 형식
+    /// `MEMO/<MemoShapeIDRef>/<Number>/<id>/<id>/<Author>/\;;` 와 HWPX `<hp:parameters>` 둘 다에 싣는다
+    /// (`serializer/hwpx/field.rs` `memo_field_children_xml` 과 같은 파라미터 6종, 메모 모양 = 65535 없음).
+    /// HWP5 는 본문 끝 MEMO_LIST 꼬리(`serializer/body_text.rs` `serialize_memo_tail`)로 나간다.
+    ///
+    /// 반환: JSON `{"ok":true,"memoIndex":N,"charOffset":N}`
+    pub fn insert_memo_at(
+        &mut self,
+        section_idx: usize,
+        para_idx: usize,
+        char_offset: usize,
+        text: &str,
+        author: &str,
+    ) -> Result<String, HwpError> {
+        let field_id = self.next_click_here_field_id();
+        let memo_index = self.next_memo_index();
+        let field = new_memo_field(field_id, memo_index, text, author);
+        let inserted_offset = {
+            let section = self
+                .document
+                .sections
+                .get_mut(section_idx)
+                .ok_or_else(|| HwpError::InvalidField("구역 인덱스 초과".into()))?;
+            section.raw_stream = None;
+            let para = section
+                .paragraphs
+                .get_mut(para_idx)
+                .ok_or_else(|| HwpError::InvalidField("문단 인덱스 초과".into()))?;
+            insert_empty_field_in_para(para, char_offset, field)?
+        };
+        let stored_end_for_reset = crate::renderer::composer::paragraph_flow_end(
+            &self.document.sections[section_idx].paragraphs[para_idx],
+        );
+        self.reflow_paragraph(section_idx, para_idx);
+        let doc_hwp3_layout = self.document.layout_profile().hwp3_layout();
+        crate::renderer::composer::recalculate_section_vpos(
+            &mut self.document.sections[section_idx].paragraphs,
+            para_idx,
+            None,
+            stored_end_for_reset,
+            &self.styles,
+            self.dpi,
+            doc_hwp3_layout,
+        );
+        self.recompose_paragraph(section_idx, para_idx);
+        self.paginate_if_needed();
+        self.invalidate_page_tree_cache();
+        self.event_log.push(DocumentEvent::TextInserted {
+            section: section_idx,
+            para: para_idx,
+            offset: inserted_offset,
+            len: 0,
+        });
+        Ok(format!(
+            "{{\"ok\":true,\"memoIndex\":{},\"charOffset\":{}}}",
+            memo_index, inserted_offset
+        ))
+    }
+
+    /// [lily] 메모 번호(`memo_index`)로 본문 문단의 메모 글을 바꾼다. 작성자는 그대로 둔다.
+    /// 메모 본문은 화면 배치에 들어가지 않으므로 다시 배치하지 않는다. 못 찾으면 false.
+    pub fn set_memo_text(&mut self, memo_index: u32, text: &str) -> Result<bool, HwpError> {
+        if memo_index == 0 {
+            return Ok(false);
+        }
+        for section in &mut self.document.sections {
+            for para in &mut section.paragraphs {
+                for ctrl in &mut para.controls {
+                    if let Control::Field(field) = ctrl {
+                        if is_memo_field(field) && memo_number(field) == memo_index {
+                            field.memo_paragraphs = memo_body_paragraphs(text);
+                            section.raw_stream = None;
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// 문서 안 메모 번호의 다음 값(1부터)
+    fn next_memo_index(&self) -> u32 {
+        let mut max = 0u32;
+        for section in &self.document.sections {
+            for para in &section.paragraphs {
+                for ctrl in &para.controls {
+                    if let Control::Field(field) = ctrl {
+                        if is_memo_field(field) {
+                            max = max.max(memo_number(field));
+                        }
+                    }
+                }
+            }
+        }
+        max.saturating_add(1).max(1)
+    }
+}
+
+/// [lily] 메모 필드인가(HWPX `type="MEMO"` 또는 HWP5 출처 command `MEMO/…`)
+pub(crate) fn is_memo_field(field: &Field) -> bool {
+    field.field_type == FieldType::Memo || field.command.starts_with("MEMO/")
+}
+
+/// [lily] 메모 번호: `memo_index`, 없으면 command 셋째 토큰
+pub(crate) fn memo_number(field: &Field) -> u32 {
+    if field.memo_index != 0 {
+        return field.memo_index;
+    }
+    field
+        .command
+        .split('/')
+        .nth(2)
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(0)
+}
+
+/// [lily] 메모 작성자: command 여섯째 토큰(`MEMO/…/<Author>/`)
+pub fn memo_author(field: &Field) -> Option<&str> {
+    if !field.command.starts_with("MEMO/") {
+        return None;
+    }
+    field.command.split('/').nth(5).filter(|a| !a.is_empty())
+}
+
+/// 메모 본문 글 → 문단들(줄바꿈마다 하나, 0번 문단·글자 모양)
+fn memo_body_paragraphs(text: &str) -> Vec<Paragraph> {
+    text.split('\n')
+        .map(|line| {
+            let mut p = Paragraph::new_empty();
+            p.char_shapes = vec![crate::model::paragraph::CharShapeRef {
+                start_pos: 0,
+                char_shape_id: 0,
+            }];
+            let line = line.trim_end_matches('\r');
+            if !line.is_empty() {
+                p.insert_text_at(0, line);
+            }
+            p
+        })
+        .collect()
+}
+
+fn memo_xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// 새 메모 필드(한컴 실측 형상: command + 파라미터 6종, 메모 모양 없음)
+fn new_memo_field(field_id: u32, memo_index: u32, text: &str, author: &str) -> Field {
+    // command 는 '/' 로 토큰을 나눈다 — 작성자의 구분 문자는 비슷한 글자로 바꾼다
+    let author: String = author
+        .chars()
+        .map(|c| match c {
+            '/' => '／',
+            ';' => '；',
+            '\\' => '＼',
+            c if c.is_control() => ' ',
+            c => c,
+        })
+        .take(64)
+        .collect();
+    let command = format!(
+        "MEMO/65535/{}/{}/{}/{}/\\;;",
+        memo_index, field_id, field_id, author
+    );
+    let params = format!(
+        concat!(
+            r#"<hp:parameters cnt="6" name="">"#,
+            r#"<hp:integerParam name="Prop">0</hp:integerParam>"#,
+            r#"<hp:stringParam name="Command">{command}</hp:stringParam>"#,
+            r#"<hp:stringParam name="ID">memo{number}</hp:stringParam>"#,
+            r#"<hp:integerParam name="Number">{number}</hp:integerParam>"#,
+            r#"<hp:stringParam name="Author">{author}</hp:stringParam>"#,
+            r#"<hp:stringParam name="MemoShapeIDRef">65535</hp:stringParam>"#,
+            r#"</hp:parameters>"#,
+        ),
+        command = memo_xml_escape(&command),
+        number = memo_index,
+        author = memo_xml_escape(&author),
+    );
+    Field {
+        field_type: FieldType::Memo,
+        command,
+        properties: 0,
+        extra_properties: 0,
+        field_id,
+        ctrl_id: tags::FIELD_MEMO,
+        instance_id: None,
+        raw_type: None,
+        ctrl_data_name: None,
+        memo_index,
+        memo_paragraphs: memo_body_paragraphs(text),
+        memo_text_direction: None,
+        raw_parameters_xml: Some(params),
+        parameters: Default::default(),
+        guide_residue: None,
+        hyperlink_format: None,
+    }
 }
 
 pub(crate) fn collect_max_field_id(para: &Paragraph, max_id: &mut u32) {
@@ -2490,28 +2694,6 @@ fn insert_click_here_field_in_para(
     name: &str,
     editable: bool,
 ) -> Result<usize, HwpError> {
-    let text_len = para.text.chars().count();
-    let start = char_offset.min(text_len);
-    let gaps = raw_slot_gaps(para)?;
-    // 새 BEGIN·END는 시작 글자 바로 앞, 그 갭의 끝에 놓인다. 거기까지의 슬롯에서
-    // 거기까지 끝난 누름틀의 END를 빼면 앞에 남는 컨트롤 수다.
-    let insert_pos = gaps[start].1;
-    let insert_idx = gaps[..=start]
-        .iter()
-        .map(|&(gap_start, gap_end)| ((gap_end - gap_start) / 8) as usize)
-        .sum::<usize>()
-        - para
-            .field_ranges
-            .iter()
-            .filter(|range| range.end_char_idx <= start)
-            .count();
-
-    for range in &mut para.field_ranges {
-        if range.control_idx >= insert_idx {
-            range.control_idx += 1;
-        }
-    }
-
     let field = Field {
         field_type: FieldType::ClickHere,
         // [#1434] 이름은 ctrl_data_name(CTRL_DATA 0x57)으로 별도 저장하므로 command 에
@@ -2536,6 +2718,36 @@ fn insert_click_here_field_in_para(
         guide_residue: None,
         hyperlink_format: None,
     };
+    insert_empty_field_in_para(para, char_offset, field)
+}
+
+/// 빈 범위 필드(BEGIN·END 한 쌍)를 `char_offset` 에 넣는다 — 누름틀·[lily] 메모 공용.
+fn insert_empty_field_in_para(
+    para: &mut Paragraph,
+    char_offset: usize,
+    field: Field,
+) -> Result<usize, HwpError> {
+    let text_len = para.text.chars().count();
+    let start = char_offset.min(text_len);
+    let gaps = raw_slot_gaps(para)?;
+    // 새 BEGIN·END는 시작 글자 바로 앞, 그 갭의 끝에 놓인다. 거기까지의 슬롯에서
+    // 거기까지 끝난 누름틀의 END를 빼면 앞에 남는 컨트롤 수다.
+    let insert_pos = gaps[start].1;
+    let insert_idx = gaps[..=start]
+        .iter()
+        .map(|&(gap_start, gap_end)| ((gap_end - gap_start) / 8) as usize)
+        .sum::<usize>()
+        - para
+            .field_ranges
+            .iter()
+            .filter(|range| range.end_char_idx <= start)
+            .count();
+
+    for range in &mut para.field_ranges {
+        if range.control_idx >= insert_idx {
+            range.control_idx += 1;
+        }
+    }
 
     para.controls.insert(insert_idx, Control::Field(field));
     if para.ctrl_data_records.len() < insert_idx {

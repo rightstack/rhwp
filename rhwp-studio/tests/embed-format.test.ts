@@ -77,3 +77,30 @@ test('[lily] select.range는 문단 오프셋 범위만 받는다', async () => 
   }
   assert.deepEqual(parseParaFormat({ lineSpacingType: 'Minimum' }), { lineSpacingType: 'Minimum' });
 });
+
+test('[lily] memo.insert·memo.edit 인자를 검증한다', async () => {
+  const calls: unknown[] = [];
+  const handlers = {
+    memoInsert: async (r: unknown) => { calls.push(['insert', r]); return { ok: true, memoIndex: 1 }; },
+    memoEdit: async (r: unknown) => { calls.push(['edit', r]); return { ok: true }; },
+  } as unknown as EmbedRpcHandlers;
+  assert.deepEqual(await routeEmbedRequest('memo.insert', { text: '확인 필요', author: '영일' }, handlers), { ok: true, memoIndex: 1 });
+  await routeEmbedRequest('memo.insert', { text: '작성자 없음' }, handlers);
+  await routeEmbedRequest('memo.edit', { memoIndex: 2, text: '고침' }, handlers);
+  assert.deepEqual(calls, [
+    ['insert', { text: '확인 필요', author: '영일' }],
+    ['insert', { text: '작성자 없음', author: '' }],
+    ['edit', { memoIndex: 2, text: '고침' }],
+  ]);
+  for (const [method, params] of [
+    ['memo.insert', { text: '' }],
+    ['memo.insert', { text: '   ' }],
+    ['memo.insert', { text: 'a', author: 3 }],
+    ['memo.insert', { text: 'a', extra: 1 }],
+    ['memo.edit', { memoIndex: 0, text: 'a' }],
+    ['memo.edit', { memoIndex: 1.5, text: 'a' }],
+    ['memo.edit', { memoIndex: 1 }],
+  ] as const) {
+    await assert.rejects(() => routeEmbedRequest(method, params, handlers));
+  }
+});

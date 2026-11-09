@@ -3747,6 +3747,18 @@ export class WasmBridge {
     ));
   }
 
+  /** [lily] 본문 문단 위치에 메모(빈 범위 메모 필드)를 넣는다. 본문 문단만 */
+  insertMemo(pos: DocumentPosition, text: string, author: string): { ok: boolean; memoIndex?: number; charOffset?: number } {
+    if (!this.doc || pos.parentParaIndex !== undefined) return { ok: false };
+    return JSON.parse((this.doc as any).insertMemo(pos.sectionIndex, pos.paragraphIndex, pos.charOffset, text, author));
+  }
+
+  /** [lily] 메모 번호로 메모 글을 바꾼다. 못 찾으면 false */
+  updateMemoText(memoIndex: number, text: string): boolean {
+    if (!this.doc) return false;
+    return (this.doc as any).setMemoText(memoIndex, text) === true;
+  }
+
   // ─────────────────────────────────────────────
   // 양식 개체(Form Object) API
   // ─────────────────────────────────────────────

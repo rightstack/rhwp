@@ -386,6 +386,14 @@ export declare class RhwpEditor {
   /** 본문 문단 안 [start, end) 글자(문단 오프셋)를 고르고 화면을 옮긴다. 범위가 문단을 넘으면 selected: false */
   selectRange(range: { section: number; paragraph: number; start: number; end: number }): Promise<{ selected: boolean }>;
 
+  /** 메모 넣기·고치기(실행 취소에 남는다). 메모는 문서 화면에 그려지지 않는다 */
+  readonly memo: {
+    /** 캐럿(선택이 있으면 그 시작)에 메모. 본문 문단이 아니면 ok: false */
+    insert(text: string, author?: string): Promise<{ ok: boolean; memoIndex?: number }>;
+    /** 메모 번호(HWPX Number / HWP command)로 글 바꾸기 */
+    edit(memoIndex: number, text: string): Promise<{ ok: boolean }>;
+  };
+
   /** 상태 표시줄 값 */
   readonly status: {
     /** 캐럿의 단·줄(쪽 안 줄 번호)·칸, 모두 1부터. 본문 문단이 아니면(표·머리말·각주 안) null */

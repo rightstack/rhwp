@@ -5265,6 +5265,34 @@ impl HwpDocument {
         .map_err(|e| e.into())
     }
 
+    /// [lily] 본문 문단 위치에 메모를 넣는다(빈 범위 메모 필드, 본문 = `text`, 작성자 = `author`).
+    ///
+    /// 반환: JSON `{"ok":true,"memoIndex":N,"charOffset":N}`
+    #[wasm_bindgen(js_name = insertMemo)]
+    pub fn insert_memo_api(
+        &mut self,
+        section_idx: u32,
+        para_idx: u32,
+        char_offset: u32,
+        text: &str,
+        author: &str,
+    ) -> Result<String, JsValue> {
+        self.insert_memo_at(
+            section_idx as usize,
+            para_idx as usize,
+            char_offset as usize,
+            text,
+            author,
+        )
+        .map_err(|e| e.into())
+    }
+
+    /// [lily] 메모 번호로 메모 글을 바꾼다. 못 찾으면 false.
+    #[wasm_bindgen(js_name = setMemoText)]
+    pub fn set_memo_text_api(&mut self, memo_index: u32, text: &str) -> Result<bool, JsValue> {
+        self.set_memo_text(memo_index, text).map_err(|e| e.into())
+    }
+
     /// `insertClickHereField` 의 options object 변형 (#1413).
     ///
     /// options JSON 키: `{ sectionIdx, paraIdx, charOffset?, guide?, memo?, name?, editable? }`.

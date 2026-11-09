@@ -491,6 +491,17 @@ export class RhwpEditor {
     return this._request('select.range', { range });
   }
 
+  /**
+   * 메모 — 호스트 메모 패널용. `insert()` 는 캐럿(선택이 있으면 그 시작)에 빈 범위 메모를 넣고,
+   * `edit()` 는 메모 번호로 글을 바꿉니다. 둘 다 실행 취소에 남습니다. 메모는 문서 화면에 그려지지 않습니다.
+   */
+  get memo() {
+    return {
+      insert: (text, author = '') => this._request('memo.insert', { text, author }),
+      edit: (memoIndex, text) => this._request('memo.edit', { memoIndex, text }),
+    };
+  }
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 그대로 실행됩니다. */
   get chrome() {
     return {

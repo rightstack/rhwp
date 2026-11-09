@@ -22,6 +22,7 @@ import {
   type EmbedFormatStateV1,
   type EmbedParaFormatV1,
 } from './format-bridge.ts';
+import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
 import type {
   CanvasKitRenderModeRequest,
   CanvasKitSurfaceRequest,
@@ -100,6 +101,12 @@ export interface EmbedRpcHandlers {
 
   // ── [lily] 본문 문단 안 글자 범위 고르기(호스트 찾기 결과) ─────
   selectRange(range: EmbedBodyRangeV1): Promise<{ selected: boolean }>;
+
+  // ── [lily] 메모 넣기·고치기(호스트 메모 패널) ─────────────────
+  /** 캐럿(선택이 있으면 그 시작)에 메모. 본문 문단이 아니면 ok: false */
+  memoInsert(req: EmbedMemoInsertV1): Promise<{ ok: boolean; memoIndex?: number }>;
+  /** 메모 번호로 글 바꾸기 */
+  memoEdit(req: EmbedMemoEditV1): Promise<{ ok: boolean }>;
 }
 
 /** 본문 문단 안 [start, end) 글자(문단 오프셋) */
@@ -323,6 +330,12 @@ export async function routeEmbedRequest(
     case 'format.setPara': return handlers.formatSetPara(parseParaFormat(params.props));
     case 'status.caret': return handlers.statusCaret();
     case 'select.range': return handlers.selectRange(parseBodyRange(params.range));
+    case 'memo.insert':
+      assertOnlyKeys(params, ['text', 'author'], 'memo.insert params');
+      return handlers.memoInsert(parseMemoInsert(params));
+    case 'memo.edit':
+      assertOnlyKeys(params, ['memoIndex', 'text'], 'memo.edit params');
+      return handlers.memoEdit(parseMemoEdit(params));
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

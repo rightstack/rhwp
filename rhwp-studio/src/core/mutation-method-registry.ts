@@ -74,6 +74,7 @@ export const MUTATING_METHODS: readonly string[] = [
   'insertHyperlink', 'updateHyperlink', 'replaceHyperlinkText', 'removeHyperlink',
   'setFieldValue', 'setFieldValueByName', 'removeFieldAt', 'insertClickHereField',
   'updateClickHereProps', 'setFormValue', 'setFormValueInCell',
+  'insertMemo', 'updateMemoText', // [lily] 메모 넣기·고치기(embed memo.*) — snapshot 라우팅
   'replaceText', 'replaceOne', 'replaceAll',
   'addBookmark', 'deleteBookmark', 'renameBookmark',
   // lineseg 재계산 (#177 — 저장 lineseg 를 실제로 변경)

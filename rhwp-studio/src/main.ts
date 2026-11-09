@@ -65,6 +65,7 @@ import { maybeShowSkinOnboarding } from '@/ui/skin-onboarding-dialog';
 import { analyzeDocumentFonts } from '@/core/document-font-status';
 import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
 import { charMods, embedFormatState, paraMods } from '@/embed/format-bridge';
+import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { FONT_RULE_WEBFONT_ENTRIES } from '@/core/font-rule-runtime';
 import { setDocumentFontSubstitutions } from '@/core/font-substitution';
 import {
@@ -2270,6 +2271,16 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { selected: false };
       return { selected: inputHandler.selectBodyRange(range.section, range.paragraph, range.start, range.end) };
+    },
+    async memoInsert(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return insertMemoAtCaret(inputHandler, req);
+    },
+    async memoEdit(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return editMemo(inputHandler, req);
     },
   },
 });
