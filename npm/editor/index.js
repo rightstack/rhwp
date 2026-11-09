@@ -462,6 +462,20 @@ export class RhwpEditor {
     };
   }
 
+  /**
+   * 서식 값 — 호스트가 자기 서식 패널(값 칸·단추 눌림)을 그릴 때 씁니다.
+   *
+   * 값은 pt·% 로 통일합니다(여백·들여쓰기·문단 간격·글자 크기 = pt, 줄 간격 = Percent 면 %, 그 외 pt).
+   * 쓰기는 studio 서식 줄·정렬 단추와 같은 길이라 실행 취소 기록에 남습니다.
+   */
+  get format() {
+    return {
+      get: () => this._request('format.get'),
+      setChar: (props) => this._request('format.setChar', { props }),
+      setPara: (props) => this._request('format.setPara', { props }),
+    };
+  }
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 그대로 실행됩니다. */
   get chrome() {
     return {

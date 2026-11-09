@@ -373,6 +373,16 @@ export declare class RhwpEditor {
     apply(name: string): Promise<{ ok: boolean; activation: RhwpFontActivation }>;
   };
 
+  /** 서식 값 — 호스트 서식 패널용. 값은 pt·%(줄 간격 Percent 면 %, 그 외 pt) */
+  readonly format: {
+    /** 캐럿 위치의 글자·문단 모양 */
+    get(): Promise<RhwpFormatState>;
+    /** 선택 영역(없으면 캐럿 대기 서식)에 글자 모양 */
+    setChar(props: RhwpCharFormat): Promise<{ ok: boolean }>;
+    /** 캐럿·선택 문단에 문단 모양 */
+    setPara(props: RhwpParaFormat): Promise<{ ok: boolean }>;
+  };
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 실행된다 */
   readonly chrome: {
     get(): Promise<ChromeVisibility>;
@@ -442,6 +452,58 @@ export interface RhwpFontActivation {
   ok: boolean;
   result: 'loaded' | 'local' | 'not-supplied' | 'failed';
   webSupply: RhwpWebFontSupply;
+}
+
+export type RhwpAlignment = 'justify' | 'left' | 'right' | 'center' | 'distribute' | 'split';
+export type RhwpLineSpacingType = 'Percent' | 'Fixed' | 'SpaceOnly' | 'Minimum';
+
+export interface RhwpCharFormat {
+  fontSizePt?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  superscript?: boolean;
+  subscript?: boolean;
+  /** '#rrggbb' */
+  textColor?: string;
+}
+
+export interface RhwpParaFormat {
+  alignment?: RhwpAlignment;
+  lineSpacingType?: RhwpLineSpacingType;
+  /** Percent 면 %, 그 외 pt */
+  lineSpacing?: number;
+  marginLeftPt?: number;
+  marginRightPt?: number;
+  /** 첫 줄(음수 = 내어 쓰기) */
+  indentPt?: number;
+  spacingBeforePt?: number;
+  spacingAfterPt?: number;
+}
+
+export interface RhwpFormatState {
+  char: {
+    fontName: string | null;
+    fontSizePt: number | null;
+    textColor: string | null;
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    strikethrough: boolean;
+    superscript: boolean;
+    subscript: boolean;
+  };
+  para: {
+    alignment: RhwpAlignment | null;
+    lineSpacingType: RhwpLineSpacingType | null;
+    lineSpacing: number | null;
+    marginLeftPt: number | null;
+    marginRightPt: number | null;
+    indentPt: number | null;
+    spacingBeforePt: number | null;
+    spacingAfterPt: number | null;
+  };
 }
 
 export interface ChromeVisibility {

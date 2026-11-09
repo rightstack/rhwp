@@ -15,6 +15,13 @@ import type {
   RhwpSelectionContextV1,
   RhwpTextCommandReceiptV1,
 } from '../document-agent/types.ts';
+import {
+  parseCharFormat,
+  parseParaFormat,
+  type EmbedCharFormatV1,
+  type EmbedFormatStateV1,
+  type EmbedParaFormatV1,
+} from './format-bridge.ts';
 import type {
   CanvasKitRenderModeRequest,
   CanvasKitSurfaceRequest,
@@ -78,6 +85,14 @@ export interface EmbedRpcHandlers {
   fontsActivate(name: string): Promise<EmbedFontActivationV1>;
   fontsCurrent(): Promise<{ fontName: string | null }>;
   fontsApply(name: string): Promise<{ ok: boolean; activation: EmbedFontActivationV1 }>;
+
+  // ── [lily] 서식 값 (호스트 서식 패널·단추 눌림) ─────────────
+  /** 캐럿 위치의 글자·문단 모양 값(pt·%) */
+  formatGet(): Promise<EmbedFormatStateV1>;
+  /** 선택 영역(없으면 캐럿 대기 서식)에 글자 모양 — studio 서식 줄과 같은 길 */
+  formatSetChar(props: EmbedCharFormatV1): Promise<{ ok: boolean }>;
+  /** 캐럿·선택 문단에 문단 모양 — studio 정렬 단추와 같은 길(실행 취소 기록) */
+  formatSetPara(props: EmbedParaFormatV1): Promise<{ ok: boolean }>;
 }
 
 export type EmbedWebFontSupplyV1 = 'loaded' | 'registered' | 'catalogued' | 'absent';
@@ -270,6 +285,9 @@ export async function routeEmbedRequest(
     case 'fonts.activate': return handlers.fontsActivate(asFontName(params.name));
     case 'fonts.current': return handlers.fontsCurrent();
     case 'fonts.apply': return handlers.fontsApply(asFontName(params.name));
+    case 'format.get': return handlers.formatGet();
+    case 'format.setChar': return handlers.formatSetChar(parseCharFormat(params.props));
+    case 'format.setPara': return handlers.formatSetPara(parseParaFormat(params.props));
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

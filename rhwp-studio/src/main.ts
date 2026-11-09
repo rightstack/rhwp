@@ -64,6 +64,7 @@ import { initThemeSync, setThemeMode, getThemeMode, getEffectiveTheme } from '@/
 import { maybeShowSkinOnboarding } from '@/ui/skin-onboarding-dialog';
 import { analyzeDocumentFonts } from '@/core/document-font-status';
 import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
+import { charMods, embedFormatState, paraMods } from '@/embed/format-bridge';
 import { FONT_RULE_WEBFONT_ENTRIES } from '@/core/font-rule-runtime';
 import { setDocumentFontSubstitutions } from '@/core/font-substitution';
 import {
@@ -2208,6 +2209,30 @@ installEmbedRuntime({
       if (fontId < 0) return { ok: false, activation };
       eventBus.emit('format-char', { fontId } as CharProperties);
       return { ok: true, activation };
+    },
+    async formatGet() {
+      await initPromise;
+      const ih = wasm.pageCount > 0 ? inputHandler : null;
+      const read = <T>(f: () => T): T | null => { try { return f(); } catch { return null; } };
+      return embedFormatState(
+        ih ? read(() => ih.getCharProperties()) : null,
+        ih ? read(() => ih.getParaProperties()) : null,
+      );
+    },
+    async formatSetChar(props) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      // studio 서식 줄(글자 크기·색)과 같은 길 — 선택·셀 블록·캐럿 대기 서식을 InputHandler 가 고른다
+      eventBus.emit('format-char', charMods(props) as CharProperties);
+      return { ok: true };
+    },
+    async formatSetPara(props) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      const current = embedFormatState(null, inputHandler.getParaProperties()).para.lineSpacingType;
+      inputHandler.applyParaPropsAtCursor(paraMods(props, current));
+      inputHandler.focus();
+      return { ok: true };
     },
   },
 });
