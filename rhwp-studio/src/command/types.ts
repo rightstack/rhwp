@@ -26,6 +26,8 @@ export interface EditorContext {
   inTableObjectSelection: boolean;
   /** 그림 객체 선택 모드인가? */
   inPictureObjectSelection: boolean;
+  /** [lily] 개체 선택 모드에서 고른 개체 종류(그림·도형·수식·묶음·선·OLE). 개체 선택이 아니면 null/없음 */
+  selectedObjectType?: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' | null;
   /** 커서가 누름틀 필드 내부인가? */
   inField: boolean;
   /** 편집 가능 모드인가? (vs 읽기 전용) */

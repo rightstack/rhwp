@@ -97,6 +97,27 @@ export interface EmbedRpcHandlers {
   // ── [lily] 상태 표시줄 단·줄·칸 ─────────────────────────────
   /** 캐럿의 단·줄(쪽 안)·칸. 본문 문단이 아니면(표·머리말·각주 안) null */
   statusCaret(): Promise<EmbedCaretPositionV1 | null>;
+
+  // ── [lily] 본문 문단 안 글자 범위 고르기(호스트 찾기 결과) ─────
+  selectRange(range: EmbedBodyRangeV1): Promise<{ selected: boolean }>;
+}
+
+/** 본문 문단 안 [start, end) 글자(문단 오프셋) */
+export interface EmbedBodyRangeV1 {
+  section: number;
+  paragraph: number;
+  start: number;
+  end: number;
+}
+
+function parseBodyRange(value: unknown): EmbedBodyRangeV1 {
+  const r = asParams(value);
+  assertOnlyKeys(r, ['section', 'paragraph', 'start', 'end'], 'range');
+  for (const key of ['section', 'paragraph', 'start', 'end'] as const) {
+    if (!Number.isSafeInteger(r[key]) || (r[key] as number) < 0) throw new Error(`range.${key} must be a non-negative safe integer`);
+  }
+  if ((r.end as number) < (r.start as number)) throw new Error('range.end must not be before range.start');
+  return r as unknown as EmbedBodyRangeV1;
 }
 
 /** 단·줄·칸(모두 1부터). page = 전체 쪽 번호(0부터, 쪽 배치에서 못 찾으면 -1) */
@@ -301,6 +322,7 @@ export async function routeEmbedRequest(
     case 'format.setChar': return handlers.formatSetChar(parseCharFormat(params.props));
     case 'format.setPara': return handlers.formatSetPara(parseParaFormat(params.props));
     case 'status.caret': return handlers.statusCaret();
+    case 'select.range': return handlers.selectRange(parseBodyRange(params.range));
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

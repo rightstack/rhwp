@@ -483,6 +483,14 @@ export class RhwpEditor {
     };
   }
 
+  /**
+   * 본문 문단 안 [start, end) 글자를 고르고 화면을 그 자리로 옮깁니다(찾기 결과 등).
+   * 오프셋은 문단 오프셋입니다. 범위가 문단을 넘으면 `selected: false`.
+   */
+  selectRange(range) {
+    return this._request('select.range', { range });
+  }
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 그대로 실행됩니다. */
   get chrome() {
     return {

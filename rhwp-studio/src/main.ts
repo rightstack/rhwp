@@ -284,6 +284,9 @@ function getContext(): EditorContext {
     hasTableTransposeClipboard: wasm.hasTableTransposeClipboard(),
     inTableObjectSelection: inputHandler?.isInTableObjectSelection() ?? false,
     inPictureObjectSelection: inputHandler?.isInPictureObjectSelection() ?? false,
+    selectedObjectType: inputHandler?.isInPictureObjectSelection()
+      ? inputHandler.getSelectedPictureRef()?.type ?? null
+      : null,
     inField: inputHandler?.isInField() ?? false,
     isEditable: !isFormMode || canEditFormField,
     editMode,
@@ -2262,6 +2265,11 @@ installEmbedRuntime({
       await initPromise;
       updateCaretPositionStatus();
       return caretPositionInfo;
+    },
+    async selectRange(range) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { selected: false };
+      return { selected: inputHandler.selectBodyRange(range.section, range.paragraph, range.start, range.end) };
     },
   },
 });

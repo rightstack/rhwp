@@ -58,5 +58,22 @@ test('[lily] embed router는 format 인자를 검증한다', async () => {
   // 단·줄·칸
   const caret = { page: 0, column: 1, line: 3, char: 5 };
   assert.deepEqual(await routeEmbedRequest('status.caret', {}, { statusCaret: async () => caret } as unknown as EmbedRpcHandlers), caret);
+});
+
+test('[lily] select.range는 문단 오프셋 범위만 받는다', async () => {
+  const got: unknown[] = [];
+  const handlers = { selectRange: async (r: unknown) => { got.push(r); return { selected: true }; } } as unknown as EmbedRpcHandlers;
+  const range = { section: 0, paragraph: 3, start: 2, end: 5 };
+  assert.deepEqual(await routeEmbedRequest('select.range', { range }, handlers), { selected: true });
+  assert.deepEqual(got, [range]);
+  for (const bad of [
+    { section: 0, paragraph: 3, start: 5, end: 2 },
+    { section: -1, paragraph: 0, start: 0, end: 0 },
+    { section: 0, paragraph: 0, start: 0.5, end: 1 },
+    { section: 0, paragraph: 0, start: 0, end: 1, extra: 1 },
+    { section: 0, paragraph: 0, start: 0 },
+  ]) {
+    await assert.rejects(() => routeEmbedRequest('select.range', { range: bad }, handlers));
+  }
   assert.deepEqual(parseParaFormat({ lineSpacingType: 'Minimum' }), { lineSpacingType: 'Minimum' });
 });

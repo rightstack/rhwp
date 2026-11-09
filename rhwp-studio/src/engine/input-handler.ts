@@ -4937,6 +4937,38 @@ export class InputHandler {
     }
   }
 
+  /**
+   * [lily] 본문 문단 안 [start, end) 글자를 고르고 화면을 그 자리로 옮긴다(호스트 찾기 결과).
+   * focusBodyParagraph 와 같은 길이지만 문단 전체가 아니라 오프셋 범위를 고른다.
+   */
+  selectBodyRange(section: number, paragraph: number, start: number, end: number): boolean {
+    if (!Number.isSafeInteger(section) || section < 0 || !Number.isSafeInteger(paragraph) || paragraph < 0
+        || !Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start) return false;
+    try {
+      const length = this.wasm.getParagraphLength(section, paragraph);
+      if (end > length) return false;
+      this.exitFootnoteModeForBodyNavigation();
+      this.cursor.clearSelection();
+      this.cursor.moveTo({ sectionIndex: section, paragraphIndex: paragraph, charOffset: start });
+      this.cursor.setAnchor();
+      this.cursor.moveTo({ sectionIndex: section, paragraphIndex: paragraph, charOffset: end });
+      this.cursor.resetPreferredX();
+      this.active = true;
+      this.updateCaret(true);
+      this.focusTextarea();
+      const rect = this.cursor.getRect();
+      if (rect) {
+        const zoom = this.viewportManager.getZoom();
+        const centerY = this.virtualScroll.getPageOffset(rect.pageIndex) + rect.y * zoom;
+        const maxScrollTop = Math.max(0, this.container.scrollHeight - this.container.clientHeight);
+        this.container.scrollTop = Math.max(0, Math.min(maxScrollTop, centerY - this.container.clientHeight / 2));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** 현재 커서 위치의 누름틀 필드와 내용을 제거한다. */
   removeCurrentField(posOverride?: DocumentPosition): void {
     const pos = posOverride ?? this.cursor.getPosition();
