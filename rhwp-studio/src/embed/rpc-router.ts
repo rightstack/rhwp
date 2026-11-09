@@ -93,6 +93,18 @@ export interface EmbedRpcHandlers {
   formatSetChar(props: EmbedCharFormatV1): Promise<{ ok: boolean }>;
   /** 캐럿·선택 문단에 문단 모양 — studio 정렬 단추와 같은 길(실행 취소 기록) */
   formatSetPara(props: EmbedParaFormatV1): Promise<{ ok: boolean }>;
+
+  // ── [lily] 상태 표시줄 단·줄·칸 ─────────────────────────────
+  /** 캐럿의 단·줄(쪽 안)·칸. 본문 문단이 아니면(표·머리말·각주 안) null */
+  statusCaret(): Promise<EmbedCaretPositionV1 | null>;
+}
+
+/** 단·줄·칸(모두 1부터). page = 전체 쪽 번호(0부터, 쪽 배치에서 못 찾으면 -1) */
+export interface EmbedCaretPositionV1 {
+  page: number;
+  column: number;
+  line: number;
+  char: number;
 }
 
 export type EmbedWebFontSupplyV1 = 'loaded' | 'registered' | 'catalogued' | 'absent';
@@ -288,6 +300,7 @@ export async function routeEmbedRequest(
     case 'format.get': return handlers.formatGet();
     case 'format.setChar': return handlers.formatSetChar(parseCharFormat(params.props));
     case 'format.setPara': return handlers.formatSetPara(parseParaFormat(params.props));
+    case 'status.caret': return handlers.statusCaret();
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

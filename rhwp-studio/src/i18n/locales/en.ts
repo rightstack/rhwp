@@ -1923,6 +1923,7 @@ const catalog = {
   "ui.sbPage.tooltip": "Go To (Option+G)",
   "ui.sbSection.label": "Section: 1 / 1",
   "ui.sbSection.text": "Section: {p1} / {p2}",
+  "ui.sbPos.text": "Col {column} · Ln {line} · Ch {char}",
   "ui.sbZoomDisplay.tooltip": "Zoom Settings",
   "ui.sbZoomFit.tooltip": "Fit Page",
   "ui.sbZoomFitWidth.tooltip": "Fit Width",

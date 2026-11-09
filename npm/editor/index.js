@@ -476,6 +476,13 @@ export class RhwpEditor {
     };
   }
 
+  /** 상태 표시줄 값 — `caret()` = 캐럿의 단·줄(쪽 안)·칸. 본문 문단이 아니면 null */
+  get status() {
+    return {
+      caret: () => this._request('status.caret'),
+    };
+  }
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 그대로 실행됩니다. */
   get chrome() {
     return {

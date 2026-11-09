@@ -383,6 +383,12 @@ export declare class RhwpEditor {
     setPara(props: RhwpParaFormat): Promise<{ ok: boolean }>;
   };
 
+  /** 상태 표시줄 값 */
+  readonly status: {
+    /** 캐럿의 단·줄(쪽 안 줄 번호)·칸, 모두 1부터. 본문 문단이 아니면(표·머리말·각주 안) null */
+    caret(): Promise<{ page: number; column: number; line: number; char: number } | null>;
+  };
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 실행된다 */
   readonly chrome: {
     get(): Promise<ChromeVisibility>;

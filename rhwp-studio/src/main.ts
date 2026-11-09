@@ -436,6 +436,27 @@ const sbMessage = () => document.getElementById('sb-message')!;
 const sbPage = () => document.getElementById('sb-page')!;
 const sbSection = () => document.getElementById('sb-section')!;
 const sbZoomVal = () => document.getElementById('sb-zoom-val')!;
+
+/** [lily] 캐럿의 단·줄·칸(쪽 안 줄 번호, 한컴 한글과 같은 뜻). 본문 문단이 아니면 null — embed `status.caret` */
+let caretPositionInfo: { page: number; column: number; line: number; char: number } | null = null;
+function updateCaretPositionStatus(): void {
+  let info: typeof caretPositionInfo = null;
+  try {
+    if (inputHandler && wasm.pageCount > 0 && inputHandler.isCaretInBodyText()) {
+      const pos = inputHandler.getCursorPosition();
+      info = wasm.getCaretPositionInfo(pos.sectionIndex, pos.paragraphIndex, pos.charOffset);
+    }
+  } catch {
+    info = null;
+  }
+  caretPositionInfo = info;
+  const el = document.getElementById('sb-pos');
+  const divider = document.getElementById('sb-pos-divider');
+  if (!el) return;
+  el.hidden = !info;
+  if (divider) divider.hidden = !info;
+  if (info) el.textContent = t('ui.sbPos.text', { column: info.column, line: info.line, char: info.char });
+}
 let autosaveStatusRestoreTimer: ReturnType<typeof setTimeout> | null = null;
 let autosavePreviousMessage: string | null = null;
 
@@ -1179,6 +1200,9 @@ function setupEventListeners(): void {
       sbSection().textContent = t('ui.sbSection.text', { p1: pageInfo.sectionIndex + 1, p2: totalSections });
     }
   });
+
+  // [lily] 단·줄·칸 — 캐럿이 옮겨질 때마다(본문 문단만, 표·머리말 안이면 숨김)
+  eventBus.on('cursor-rect-updated', () => updateCaretPositionStatus());
 
   // 맞춤 선택은 배율 수치가 아니라 규칙이므로 그 자체를 저장한다 — 휠·가로바·수치 배율은
   // 뷰포트가 'none' 을 알려 저장된 맞춤을 푼다.
@@ -2233,6 +2257,11 @@ installEmbedRuntime({
       inputHandler.applyParaPropsAtCursor(paraMods(props, current));
       inputHandler.focus();
       return { ok: true };
+    },
+    async statusCaret() {
+      await initPromise;
+      updateCaretPositionStatus();
+      return caretPositionInfo;
     },
   },
 });

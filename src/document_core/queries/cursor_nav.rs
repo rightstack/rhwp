@@ -138,6 +138,77 @@ impl DocumentCore {
         Self::compute_line_info(para, char_offset)
     }
 
+    /// [lily] 상태 표시줄 단·줄·칸 (한컴 한글과 같은 뜻).
+    ///
+    /// - `column`: 캐럿 문단이 놓인 단(1부터)
+    /// - `line`: 그 쪽 그 단 안에서 위에서부터 센 줄 번호(1부터). 앞 문단들의 줄 수를 쪽 배치
+    ///   (`PageItem::FullParagraph`/`PartialParagraph`)에서 더한다. 표·그림 같은 개체 자리는 줄로 세지 않는다
+    /// - `char`: 그 줄 안 글자 위치(1부터)
+    /// - `page`: 전체 쪽 번호(0부터, 못 찾으면 -1)
+    ///
+    /// 본문 문단만 다룬다. 쪽 배치에서 찾지 못하면(배치 전 등) 문단 안 줄 번호로 대신한다.
+    pub fn get_caret_position_info_native(
+        &self,
+        section_idx: usize,
+        para_idx: usize,
+        char_offset: usize,
+    ) -> Result<String, HwpError> {
+        use crate::renderer::pagination::PageItem;
+        let para = self.get_render_paragraph_ref(section_idx, para_idx)?;
+        let info = Self::compute_line_info_struct(para, char_offset)?;
+        let char_in_line = char_offset.saturating_sub(info.char_start) + 1;
+        let line_count_of = |pi: usize| -> usize {
+            self.get_render_paragraph_ref(section_idx, pi)
+                .map(|p| Self::build_line_char_starts(p).len().max(1))
+                .unwrap_or(1)
+        };
+        let mut found: Option<(u32, u16, usize)> = None;
+        if let Some(pr) = self.pagination.get(section_idx) {
+            let offset: u32 = self.pagination[..section_idx]
+                .iter()
+                .map(|p| p.pages.len() as u32)
+                .sum();
+            'pages: for (local, page) in pr.pages.iter().enumerate() {
+                for col in &page.column_contents {
+                    let mut lines = 0usize;
+                    for item in &col.items {
+                        let (pi, start, end) = match item {
+                            PageItem::FullParagraph { para_index } => {
+                                (*para_index, 0, line_count_of(*para_index))
+                            }
+                            PageItem::PartialParagraph {
+                                para_index,
+                                start_line,
+                                end_line,
+                            } => (*para_index, *start_line, *end_line),
+                            _ => continue,
+                        };
+                        if pi == para_idx
+                            && info.line_index >= start
+                            && info.line_index < end.max(start + 1)
+                        {
+                            found = Some((
+                                offset + local as u32,
+                                col.column_index,
+                                lines + (info.line_index - start) + 1,
+                            ));
+                            break 'pages;
+                        }
+                        lines += end.saturating_sub(start);
+                    }
+                }
+            }
+        }
+        let (page, column, line) = match found {
+            Some((page, column, line)) => (page as i64, column as usize + 1, line),
+            None => (-1, 1, info.line_index + 1),
+        };
+        Ok(format!(
+            "{{\"page\":{},\"column\":{},\"line\":{},\"char\":{}}}",
+            page, column, line, char_in_line
+        ))
+    }
+
     pub(crate) fn get_render_paragraph_ref(
         &self,
         section_idx: usize,

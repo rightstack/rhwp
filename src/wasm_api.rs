@@ -3238,6 +3238,24 @@ impl HwpDocument {
         .map_err(|e| e.into())
     }
 
+    /// [lily] 상태 표시줄 단·줄·칸(쪽 안 줄 번호, 한컴과 같은 뜻). 본문 문단만.
+    ///
+    /// 반환: JSON `{"page":N,"column":N,"line":N,"char":N}` (page 는 0부터, 못 찾으면 -1)
+    #[wasm_bindgen(js_name = getCaretPositionInfo)]
+    pub fn get_caret_position_info(
+        &self,
+        section_idx: u32,
+        para_idx: u32,
+        char_offset: u32,
+    ) -> Result<String, JsValue> {
+        self.get_caret_position_info_native(
+            section_idx as usize,
+            para_idx as usize,
+            char_offset as usize,
+        )
+        .map_err(|e| e.into())
+    }
+
     /// 표 셀 내 문단의 줄 정보를 반환한다.
     ///
     /// 반환: JSON `{"lineIndex":N,"lineCount":N,"charStart":N,"charEnd":N}`

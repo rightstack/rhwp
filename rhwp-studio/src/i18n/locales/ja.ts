@@ -1922,6 +1922,7 @@ const catalog = {
   "ui.sbPage.tooltip": "ジャンプ (Option+G)",
   "ui.sbSection.label": "区域: 1 / 1",
   "ui.sbSection.text": "区域: {p1} / {p2}",
+  "ui.sbPos.text": "{column}段 {line}行 {char}字",
   "ui.sbZoomDisplay.tooltip": "画面の拡大/縮小設定",
   "ui.sbZoomFit.tooltip": "ページに合わせる",
   "ui.sbZoomFitWidth.tooltip": "幅に合わせる",

@@ -55,5 +55,8 @@ test('[lily] embed router는 format 인자를 검증한다', async () => {
     await assert.rejects(() => routeEmbedRequest(method, { props }, handlers));
   }
   assert.throws(() => parseCharFormat([]));
+  // 단·줄·칸
+  const caret = { page: 0, column: 1, line: 3, char: 5 };
+  assert.deepEqual(await routeEmbedRequest('status.caret', {}, { statusCaret: async () => caret } as unknown as EmbedRpcHandlers), caret);
   assert.deepEqual(parseParaFormat({ lineSpacingType: 'Minimum' }), { lineSpacingType: 'Minimum' });
 });

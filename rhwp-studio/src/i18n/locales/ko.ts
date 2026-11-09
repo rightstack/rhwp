@@ -1923,6 +1923,7 @@ const catalog = {
   "ui.sbPage.tooltip": "찾아가기 (Option+G)",
   "ui.sbSection.label": "구역: 1 / 1",
   "ui.sbSection.text": "구역: {p1} / {p2}",
+  "ui.sbPos.text": "{column}단 {line}줄 {char}칸",
   "ui.sbZoomDisplay.tooltip": "화면 확대/축소 설정",
   "ui.sbZoomFit.tooltip": "쪽 맞춤",
   "ui.sbZoomFitWidth.tooltip": "폭 맞춤",

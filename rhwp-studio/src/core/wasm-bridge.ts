@@ -1818,6 +1818,12 @@ export class WasmBridge {
     return JSON.parse(this.doc.getLineInfo(sec, para, charOffset));
   }
 
+  /** [lily] 상태 표시줄 단·줄·칸(본문 문단, 쪽 안 줄 번호). page 는 0부터, 쪽 배치에서 못 찾으면 -1 */
+  getCaretPositionInfo(sec: number, para: number, charOffset: number): { page: number; column: number; line: number; char: number } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse(this.doc.getCaretPositionInfo(sec, para, charOffset));
+  }
+
   getLineInfoInCell(sec: number, parentPara: number, controlIdx: number, cellIdx: number, cellParaIdx: number, charOffset: number): LineInfo {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse(this.doc.getLineInfoInCell(sec, parentPara, controlIdx, cellIdx, cellParaIdx, charOffset));

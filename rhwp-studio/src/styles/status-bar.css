@@ -90,6 +90,12 @@
   display: none;
 }
 
+/* [lily] 단·줄·칸 — 본문 문단이 아닐 때 숨김 */
+#sb-pos[hidden],
+#sb-pos-divider[hidden] {
+  display: none;
+}
+
 /* 우측 줌 영역 — 한컴 .inline_panel.justify_right.align_item_center */
 .stb-right {
   display: flex;

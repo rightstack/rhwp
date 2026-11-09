@@ -5426,6 +5426,12 @@ export class InputHandler {
   /** 커서가 표 셀 내부인가? */
   isInTable(): boolean { return this.cursor.isInCell(); }
 
+  /** [lily] 커서가 본문 문단에 있는가(표 셀·글상자·머리말·각주 밖) — 상태 표시줄 단·줄·칸 */
+  isCaretInBodyText(): boolean {
+    return !this.cursor.isInHeaderFooter() && !this.cursor.isInFootnote()
+      && this.cursor.getPosition().parentParaIndex === undefined;
+  }
+
   /** 셀 선택 모드인가? */
   isInCellSelectionMode(): boolean { return this.cursor.isInCellSelectionMode(); }
 
