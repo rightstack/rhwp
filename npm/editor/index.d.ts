@@ -400,6 +400,28 @@ export declare class RhwpEditor {
     ok: boolean; section?: number; paragraph?: number; offset?: number; paragraphsAdded?: number;
   }>;
 
+  /** 캐럿(선택이 있으면 바꿈)에 블록 = 문단 하나씩. 스타일·굵게·코드 언어까지 실행 취소 한 단계. 캐럿 = 넣은 글 끝 */
+  insertBlocks(blocks: Array<{
+    text: string;
+    style?: 'body' | 'outline1' | 'outline2' | 'outline3' | 'code';
+    lang?: string;
+    /** [start, end) 글자(코어 단위 = 유니코드 scalar) */
+    bold?: Array<[number, number]>;
+  }>): Promise<{ ok: boolean; section?: number; paragraph?: number; offset?: number; reason?: string }>;
+
+  /** 마크다운 입력 규칙(기본 꺼짐) */
+  readonly markdown: {
+    setRules(enabled: boolean): Promise<{ ok: boolean }>;
+  };
+
+  /** 코드 블록 — 연속한 '코드' 스타일 본문 문단, 언어 = 책갈피 `_lily_code_<lang>_<n>` */
+  readonly code: {
+    blocks(): Promise<Array<{ section: number; paragraph: number; count: number; lang: string; lines: string[] }>>;
+    context(): Promise<{ section: number; paragraph: number; count: number; lang: string } | null>;
+    /** 실행 취소 한 단계 */
+    setLanguage(section: number, paragraph: number, lang: string): Promise<{ ok: boolean }>;
+  };
+
   /** 상태 표시줄 값 */
   readonly status: {
     /** 캐럿의 단·줄(쪽 안 줄 번호)·칸, 모두 1부터. 본문 문단이 아니면(표·머리말·각주 안) null */

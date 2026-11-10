@@ -510,6 +510,30 @@ export class RhwpEditor {
     return this._request('text.insert', position);
   }
 
+  /**
+   * 캐럿(선택이 있으면 그 자리를 바꿈)에 블록을 문단 하나씩 넣습니다 — 스타일(개요 1~3·코드)·굵게·코드 언어까지
+   * 실행 취소 한 단계. 캐럿이 본문 문단이 아니면 `{ ok: false, reason: 'not-body' }`.
+   */
+  insertBlocks(blocks) {
+    return this._request('text.insertBlocks', { blocks });
+  }
+
+  /** 마크다운 입력 규칙(`# `~`### `·`**굵게**`·```언어 + Enter). 기본 꺼짐 */
+  get markdown() {
+    return {
+      setRules: (enabled) => this._request('markdown.setRules', { enabled }),
+    };
+  }
+
+  /** 코드 블록('코드' 스타일 문단 묶음, 언어 = 책갈피 `_lily_code_<lang>_<n>`) */
+  get code() {
+    return {
+      blocks: () => this._request('code.blocks'),
+      context: () => this._request('code.context'),
+      setLanguage: (section, paragraph, lang) => this._request('code.setLanguage', { section, paragraph, lang }),
+    };
+  }
+
   /** 메뉴·툴바·상태표시줄 표시. 숨겨도 커맨드는 그대로 실행됩니다. */
   get chrome() {
     return {

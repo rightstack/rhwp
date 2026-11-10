@@ -24,6 +24,10 @@ import {
 } from './format-bridge.ts';
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
+import { parseMarkdownRules } from './markdown-rules.ts';
+import {
+  parseInsertBlocks, sanitizeLanguage, type CodeBlockInfoV1, type InsertBlockV1,
+} from './code-blocks.ts';
 import type {
   CanvasKitRenderModeRequest,
   CanvasKitSurfaceRequest,
@@ -111,6 +115,18 @@ export interface EmbedRpcHandlers {
 
   // ── [lily] 본문 위치에 글 넣기(줄바꿈 = 문단 나누기, 실행 취소 한 단계) ──
   textInsert(req: EmbedTextInsertV1): Promise<EmbedTextInsertResultV1>;
+
+  // ── [lily] 마크다운 입력 규칙·코드 블록(호스트가 켤 때만 — 기본 꺼짐) ──
+  /** 입력 규칙 켬/끔(`# `~`### `·`**굵게**`·```언어 + Enter) */
+  markdownSetRules(req: { enabled: boolean }): Promise<{ ok: boolean }>;
+  /** 캐럿(선택이 있으면 바꿈)에 블록 = 문단 하나씩, 스타일·굵게·코드 언어까지 실행 취소 한 단계 */
+  textInsertBlocks(req: { blocks: InsertBlockV1[] }): Promise<{ ok: boolean; section?: number; paragraph?: number; offset?: number; reason?: string }>;
+  /** 문서의 코드 블록(본문) */
+  codeBlocks(): Promise<CodeBlockInfoV1[]>;
+  /** 캐럿이 있는 코드 블록(없으면 null) */
+  codeContext(): Promise<{ section: number; paragraph: number; count: number; lang: string } | null>;
+  /** 블록 언어 바꾸기(실행 취소 한 단계) */
+  codeSetLanguage(req: { section: number; paragraph: number; lang: string }): Promise<{ ok: boolean }>;
 }
 
 /** 본문 문단 안 [start, end) 글자(문단 오프셋) */
@@ -343,6 +359,20 @@ export async function routeEmbedRequest(
     case 'text.insert':
       assertOnlyKeys(params, ['section', 'paragraph', 'offset', 'text'], 'text.insert params');
       return handlers.textInsert(parseTextInsert(params));
+    case 'markdown.setRules':
+      assertOnlyKeys(params, ['enabled'], 'markdown.setRules params');
+      return handlers.markdownSetRules(parseMarkdownRules(params));
+    case 'text.insertBlocks':
+      assertOnlyKeys(params, ['blocks'], 'text.insertBlocks params');
+      return handlers.textInsertBlocks(parseInsertBlocks(params));
+    case 'code.blocks': return handlers.codeBlocks();
+    case 'code.context': return handlers.codeContext();
+    case 'code.setLanguage': {
+      assertOnlyKeys(params, ['section', 'paragraph', 'lang'], 'code.setLanguage params');
+      const range = parseBodyRange({ section: params.section, paragraph: params.paragraph, start: 0, end: 0 });
+      if (typeof params.lang !== 'string') throw new Error('lang must be a string');
+      return handlers.codeSetLanguage({ section: range.section, paragraph: range.paragraph, lang: sanitizeLanguage(params.lang) });
+    }
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

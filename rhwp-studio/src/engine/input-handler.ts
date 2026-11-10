@@ -526,6 +526,11 @@ export class InputHandler {
   // IME 조합 상태
   private isComposing = false;
   private compositionAnchor: DocumentPosition | null = null;
+  /**
+   * [lily] 임베드 호스트가 켠 마크다운 입력 규칙(embed/markdown-rules.ts). null(기본)이면 upstream 동작 그대로.
+   * 공백(비조합 입력)·본문 Enter·본문 Esc 에서만 부른다.
+   */
+  lilyMarkdown: { afterSpace(): void; beforeEnter(): boolean; revertLast(): boolean } | null = null;
   private compositionLength = 0; // 문서에 삽입된 조합 텍스트 길이
   /** [#7489] 수정 모드에서 이번 조합이 덮어쓴 글자. null 이면 첫 조합 글자에서 정한다. */
   private _compositionCovered: string | null = '';
@@ -5509,6 +5514,10 @@ export class InputHandler {
 
   /** Undo 실행 (커맨드 시스템용) */
   performUndo(): void { this.handleUndo(); }
+
+  /** [lily] 실행 취소 꼭대기 명령(같은 객체인지로 "직전 동작"을 판정한다 — 마크다운 규칙 Esc 되돌리기) */
+  peekUndoCommand(): EditCommand | null { return this.history.peekUndoTop(); }
+
 
   /** Redo 실행 (커맨드 시스템용) */
   performRedo(): void { this.handleRedo(); }

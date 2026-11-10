@@ -1371,6 +1371,11 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
   //  - 글상자 안 (안 표 외 위치) → 글상자 객체 선택
   //  - 본문 표 셀 → 표 객체 선택
   //  한컴 UX 정합 (`feedback_visual_judgment_authority`).
+  // [lily] 마크다운 규칙 변환 직후 Esc → 변환만 되돌린다(규칙이 꺼져 있으면 upstream 그대로)
+  if (e.key === 'Escape' && this.lilyMarkdown?.revertLast()) {
+    e.preventDefault();
+    return;
+  }
   if (e.key === 'Escape') {
     e.preventDefault();
     const inCell = this.cursor.isInCell();
@@ -1444,6 +1449,8 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
     case 'Enter': {
       e.preventDefault();
       if (this.isFormMode?.()) return;
+      // [lily] 코드 펜스(```언어) → 코드 블록, 빈 마지막 코드 줄 → 빠져나오기. 규칙이 꺼져 있으면 upstream 그대로
+      if (!e.shiftKey && !inCell && !this.cursor.hasSelection() && this.lilyMarkdown?.beforeEnter()) break;
       if (this.cursor.hasSelection()) this.deleteSelection();
       if (e.shiftKey) {
         // Shift+Enter: 강제 줄바꿈 (문단 유지, 줄만 바꿈)

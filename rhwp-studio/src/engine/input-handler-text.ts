@@ -868,6 +868,8 @@ export function onInput(this: any, e?: InputEvent): void {
   if (refreshClickHereGuide) {
     this.refreshClickHereAfterFirstInput?.();
   }
+  // [lily] 마크다운 입력 규칙(임베드 호스트가 켰을 때만). 조합 확정·조합 중 입력은 위 분기에서 끝나 여기 오지 않는다
+  if (text === ' ') this.lilyMarkdown?.afterSpace();
 }
 
 export function insertTextAtRaw(this: any, pos: DocumentPosition, text: string): TextMutationEffects {

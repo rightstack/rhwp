@@ -67,6 +67,10 @@ import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
 import { charMods, embedFormatState, paraMods } from '@/embed/format-bridge';
 import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { insertTextAt } from '@/embed/text-ops';
+import { MarkdownRules } from '@/embed/markdown-rules';
+import {
+  applyInsertBlocks, codeContextAt, listCodeBlocks, setBlockLanguage, type CodeWasm,
+} from '@/embed/code-blocks';
 import { FONT_RULE_WEBFONT_ENTRIES } from '@/core/font-rule-runtime';
 import { setDocumentFontSubstitutions } from '@/core/font-substitution';
 import {
@@ -2287,6 +2291,72 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return insertTextAt(inputHandler, req);
+    },
+    async markdownSetRules(req) {
+      await initPromise;
+      if (!inputHandler) return { ok: false };
+      inputHandler.lilyMarkdown = req.enabled ? new MarkdownRules(inputHandler, wasm) : null;
+      return { ok: true };
+    },
+    async textInsertBlocks(req) {
+      await initPromise;
+      const ih = inputHandler;
+      if (!ih || wasm.pageCount === 0) return { ok: false, reason: 'no-document' };
+      if (!ih.isCaretInBodyText()) return { ok: false, reason: 'not-body' };
+      const sel = ih.getSelection();
+      const collapsed = !sel || (sel.start.paragraphIndex === sel.end.paragraphIndex && sel.start.charOffset === sel.end.charOffset
+        && sel.start.sectionIndex === sel.end.sectionIndex);
+      if (sel && !collapsed && (sel.start.parentParaIndex !== undefined || sel.end.parentParaIndex !== undefined
+        || sel.start.sectionIndex !== sel.end.sectionIndex)) return { ok: false, reason: 'not-body' };
+      const at = collapsed ? ih.getCursorPosition() : sel!.start;
+      let result: ReturnType<typeof applyInsertBlocks> = null;
+      ih.executeOperation({
+        kind: 'snapshot',
+        operationType: 'insertBlocksEmbed',
+        operation: (w) => {
+          const cw = w as unknown as CodeWasm;
+          let para = at.paragraphIndex;
+          let offset = at.charOffset;
+          if (!collapsed) {
+            const r = cw.deleteRange(at.sectionIndex, sel!.start.paragraphIndex, sel!.start.charOffset, sel!.end.paragraphIndex, sel!.end.charOffset);
+            if (!r.ok) return null;
+            para = r.paraIdx;
+            offset = r.charOffset;
+          }
+          result = applyInsertBlocks(cw, { section: at.sectionIndex, paragraph: para, offset }, req.blocks);
+          return result ? { sectionIndex: result.section, paragraphIndex: result.paragraph, charOffset: result.offset } : null;
+        },
+      });
+      ih.focus();
+      const r = result as ReturnType<typeof applyInsertBlocks>;
+      return r ? { ok: true, section: r.section, paragraph: r.paragraph, offset: r.offset } : { ok: false, reason: 'out-of-range' };
+    },
+    async codeBlocks() {
+      await initPromise;
+      if (wasm.pageCount === 0) return [];
+      return listCodeBlocks(wasm as unknown as CodeWasm);
+    },
+    async codeContext() {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0 || !inputHandler.isCaretInBodyText()) return null;
+      return codeContextAt(wasm as unknown as CodeWasm, inputHandler.getCursorPosition());
+    },
+    async codeSetLanguage(req) {
+      await initPromise;
+      const ih = inputHandler;
+      if (!ih || wasm.pageCount === 0) return { ok: false };
+      let ok = false;
+      ih.executeOperation({
+        kind: 'snapshot',
+        operationType: 'codeLanguageEmbed',
+        operation: (w) => {
+          const cw = w as unknown as CodeWasm;
+          if (req.section >= cw.getSectionCount() || req.paragraph >= cw.getParagraphCount(req.section)) return null;
+          ok = setBlockLanguage(cw, req.section, req.paragraph, req.lang);
+          return ok ? ih.getCursorPosition() : null;
+        },
+      });
+      return { ok };
     },
   },
 });
