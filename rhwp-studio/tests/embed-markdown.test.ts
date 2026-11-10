@@ -53,6 +53,7 @@ function fakeWasm(texts: string[]) {
   const paras: Para[] = texts.map((t) => mk(t));
   const marks: Array<{ name: string; para: number }> = [];
   const numberings: string[][] = [['^1.', '^2.', '^3.', '', '', '', '']];
+  const sizes: number[] = [];
   const calls: string[] = [];
   const w: CodeWasm = {
     getSectionCount: () => 1,
@@ -77,11 +78,14 @@ function fakeWasm(texts: string[]) {
     },
     getParaPropertiesAt: (_s, p) => ({ paraShapeId: 9, headType: paras[p].style >= 1 && paras[p].style <= 3 ? 'Outline' : 'None', numberingId: paras[p].numbering }),
     setParaShapeId(_s, p) { paras[p].numbering = 0; return '{"ok":true}'; },
+    setCharShapeId(_s, p, a, b) { for (let i = a; i < b; i++) paras[p].bold[i] = false; sizes[p] = 0; return '{"ok":true}'; },
+    getStyleDetail: () => ({ charProps: { fontSize: 1000 } }),
     getNumberingList: () => numberings.map((f, i) => ({ id: i + 1, levelFormats: f })),
     createNumbering(json) { numberings.push(JSON.parse(json).levelFormats.length ? ['^1.'] : ['', '', '', '', '', '', '']); return numberings.length; },
     findOrCreateFontId: () => 5,
     applyCharFormat(_s, p, a, b, json) {
       const j = JSON.parse(json);
+      if (j.fontSize !== undefined) sizes[p] = j.fontSize;
       for (let i = a; i < b; i++) {
         if (j.bold !== undefined) paras[p].bold[i] = j.bold;
         if (j.textColor) paras[p].color[i] = j.textColor;
@@ -118,7 +122,7 @@ function fakeWasm(texts: string[]) {
     },
     deleteRange: () => ({ ok: false, paraIdx: 0, charOffset: 0 }),
   };
-  return { w, paras, marks, styles, calls };
+  return { w, paras, marks, styles, calls, sizes };
 }
 
 test('[lily] insertBlocks: 제목·본문 굵게·코드 블록을 문단마다, 코드 언어는 블록 첫 문단 책갈피', () => {
@@ -149,15 +153,17 @@ test('[lily] insertBlocks: 제목·본문 굵게·코드 블록을 문단마다,
 
 test('[lily] 규칙 제목 = 개요 스타일 + 번호 형식이 빈 정의(하나를 다시 쓴다), 직접 준 개요와 구분', () => {
   const f = fakeWasm(['a', 'b', 'c']);
-  applyRuleHeading(f.w, 0, 0, 2);
-  applyRuleHeading(f.w, 0, 1, 1);
+  applyRuleHeading(f.w, 0, 0, 2, 2);
+  applyRuleHeading(f.w, 0, 1, 1, 1);
+  assert.deepEqual([f.sizes[0], f.sizes[1], f.paras[0].bold], [1400, 1600, [true]], '굵게 + 바탕글 × 1.4 / 1.6');
+  assert.ok(f.calls.some((c) => c.startsWith('para 0 ') && c.includes('"marginLeft":0') && c.includes('"spacingBefore":800')));
   assert.equal(f.paras[0].numbering, 2);
   assert.equal(f.paras[1].numbering, 2, '빈 번호 정의는 하나만 만든다');
   assert.ok(isRuleHeading(f.w, 0, 0));
   f.w.applyStyle(0, 2, 1);
   assert.ok(!isRuleHeading(f.w, 0, 2), '사용자가 직접 준 개요');
   applyBodyStyle(f.w, 0, 1);
-  assert.deepEqual([f.paras[1].style, f.paras[1].numbering], [0, 0]);
+  assert.deepEqual([f.paras[1].style, f.paras[1].numbering, f.sizes[1], f.paras[1].bold], [0, 0, 0, [false]], '바탕글 = 글자 모양도');
 });
 
 test('[lily] insertBlocks: 본문 한 블록은 캐럿 문단 스타일을 바꾸지 않는다(코드 줄에 글 넣기)', () => {

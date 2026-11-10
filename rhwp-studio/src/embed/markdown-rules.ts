@@ -3,7 +3,7 @@
  *
  * LilyOffice 에이치독스(2026-11-10 M10)가 요청한 세 규칙이다. 조합(IME) 중에는 판단하지 않는다 — 공백은
  * `onInput` 의 비조합 분기에서만, Enter 는 본문 `case 'Enter'` 에서만 부른다(조합 중 Enter 는 확정만 한다).
- * - 문단 맨 앞 `# `~`### ` 뒤 공백 → 개요 1~3 스타일(접두어 삭제), 마크다운처럼 번호 없이. 그 제목 끝에서 Enter → 다음 문단은 바탕글
+ * - 문단 맨 앞 `# `~`### ` 뒤 공백 → 개요 1~3 스타일(접두어 삭제), 마크다운처럼 번호 없이 굵게·크게. 그 제목 끝에서 Enter → 다음 문단은 바탕글
  * - `**글자**` 뒤 공백 → 굵게(별표 넷 삭제)
  * - 문단 전체가 ```` ```언어 ```` 일 때 Enter → 코드 블록('코드' 스타일 + 언어 책갈피). 빈 마지막 코드 줄에서 Enter → 바탕글로 빠져나오기
  * 변환은 snapshot 하나(= 실행 취소 한 단계). 변환 직후 Esc(또는 Ctrl/Cmd+Z 한 번)는 변환만 되돌려 원문이 남는다.
@@ -97,7 +97,7 @@ export class MarkdownRules {
       this.run((wasm) => {
         const w = wasm as unknown as CodeWasm;
         w.deleteText(sec, para, 0, rule.level + 1);
-        applyRuleHeading(w, sec, para, styleId);
+        applyRuleHeading(w, sec, para, styleId, rule.level);
         return { sectionIndex: sec, paragraphIndex: para, charOffset: 0 };
       });
       return;

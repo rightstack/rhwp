@@ -35,6 +35,8 @@ export interface CodeWasm {
   applyParaFormat(sec: number, para: number, propsJson: string): string;
   getParaPropertiesAt(sec: number, para: number): { paraShapeId?: number; headType?: string; numberingId?: number };
   setParaShapeId(sec: number, para: number, paraShapeId: number): string;
+  setCharShapeId(sec: number, para: number, start: number, end: number, charShapeId: number): string;
+  getStyleDetail(styleId: number): { charProps: { fontSize?: number } };
   getNumberingList(): Array<{ id: number; levelFormats: string[] }>;
   createNumbering(json: string): number;
   findOrCreateFontId(name: string): number;
@@ -81,15 +83,35 @@ export function plainHeadingNumberingId(w: CodeWasm): number {
   return w.getNumberingList().find((n) => n.levelFormats.length > 0 && n.levelFormats.every((f) => f === ''))?.id ?? 0;
 }
 
+/** 제목 글자 크기 배율(바탕글 기준) — 개요 1·2·3 */
+export const HEADING_SCALE = [1.6, 1.4, 1.2] as const;
+
+/** 바탕글 글자 크기(HWPUNIT = pt×100). 못 읽으면 10pt */
+function baseFontSize(w: CodeWasm): number {
+  try {
+    const size = w.getStyleDetail(0).charProps.fontSize;
+    return typeof size === 'number' && size > 0 ? size : 1000;
+  } catch {
+    return 1000;
+  }
+}
+
 /**
- * 마크다운 규칙 제목: 개요 n 스타일은 두고(개요 패널·한컴 개요에 보이게) 번호만 끈다 — 그 문단에만 번호 형식이 빈
- * 문단 번호 정의를 준다(렌더러는 형식이 빈 수준의 번호를 그리지 않는다, paragraph_layout.rs `format_str.is_empty()`).
+ * 마크다운 규칙 제목(영일 2026-11-10: 개요 n, 번호 없음, 굵게·크게): 개요 n 스타일은 두고(개요 패널·한컴 개요에 보이게)
+ * 그 문단에만 ① 번호 형식이 빈 문단 번호 정의(렌더러는 형식이 빈 수준의 번호를 그리지 않는다, paragraph_layout.rs
+ * `format_str.is_empty()`) ② 왼쪽 여백·들여쓰기 0, 위 간격 = 바탕글 크기의 0.8, 아래 0.3 ③ 문단 글 전체(빈 문단이면 캐럿 자리)
+ * 굵게 + 바탕글 × 1.6 / 1.4 / 1.2. 접두어를 지운 뒤에 부른다(빈 범위 글자 모양 = 이어 칠 글자의 모양).
  */
-export function applyRuleHeading(w: CodeWasm, sec: number, para: number, styleId: number): void {
+export function applyRuleHeading(w: CodeWasm, sec: number, para: number, styleId: number, level: number): void {
   w.applyStyle(sec, para, styleId);
   let id = plainHeadingNumberingId(w);
   if (!id) id = w.createNumbering(JSON.stringify({ levelFormats: [], startNumber: 1 }));
-  w.applyParaFormat(sec, para, JSON.stringify({ numberingId: id }));
+  const base = baseFontSize(w);
+  w.applyParaFormat(sec, para, JSON.stringify({
+    numberingId: id, marginLeft: 0, indent: 0, spacingBefore: Math.round(base * 0.8), spacingAfter: Math.round(base * 0.3),
+  }));
+  const scale = HEADING_SCALE[Math.min(Math.max(level, 1), 3) - 1];
+  w.applyCharFormat(sec, para, 0, w.getParagraphLength(sec, para), JSON.stringify({ bold: true, fontSize: Math.round(base * scale) }));
 }
 
 /** 마크다운 규칙으로 만든 제목 문단인가(개요 + 번호 형식이 빈 정의). 사용자가 직접 준 개요는 아니다 */
@@ -100,11 +122,12 @@ export function isRuleHeading(w: CodeWasm, sec: number, para: number): boolean {
   return p.headType === 'Outline' && p.numberingId === id;
 }
 
-/** 문단을 바탕글(스타일 0 의 문단 모양까지)로 */
+/** 문단을 바탕글로 — 스타일 0 의 문단 모양·글자 모양까지(제목의 굵게·크기가 이어지지 않게) */
 export function applyBodyStyle(w: CodeWasm, sec: number, para: number): void {
   const base = w.getStyleList()[0];
   if (base) w.setParaShapeId(sec, para, base.paraShapeId);
   w.applyStyle(sec, para, 0);
+  if (base) w.setCharShapeId(sec, para, 0, w.getParagraphLength(sec, para), base.charShapeId);
 }
 
 /** '코드' 스타일 id. 없으면 -1 */
@@ -401,8 +424,9 @@ export function applyInsertBlocks(
     if (style === 'body') {
       if ((codeId >= 0 && w.getStyleAt(sec, p).id === codeId) || isRuleHeading(w, sec, p)) applyBodyStyle(w, sec, p);
     } else {
-      const id = findOutlineStyleId(w, Number(style.slice(-1)));
-      if (id >= 0) applyRuleHeading(w, sec, p, id);
+      const level = Number(style.slice(-1));
+      const id = findOutlineStyleId(w, level);
+      if (id >= 0) applyRuleHeading(w, sec, p, id, level);
     }
   });
   for (const { para: p, base, block } of placed) {
