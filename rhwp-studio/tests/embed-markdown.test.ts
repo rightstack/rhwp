@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { routeEmbedRequest, type EmbedRpcHandlers } from '../src/embed/rpc-router.ts';
 import { detectFence, detectSpaceRule } from '../src/embed/markdown-rules.ts';
 import {
-  applyInsertBlocks, codeContextAt, languageOfBookmark, listCodeBlocks, paintCode, parseCodePaint, parseInsertBlocks,
+  applyBodyStyle, applyInsertBlocks, applyRuleHeading, codeContextAt, isRuleHeading, languageOfBookmark, listCodeBlocks, paintCode, parseCodePaint, parseInsertBlocks,
   sanitizeLanguage, setBlockLanguage, type CodeWasm,
 } from '../src/embed/code-blocks.ts';
 
@@ -38,7 +38,7 @@ test('[lily] 코드 펜스와 언어 토큰', () => {
   assert.equal(languageOfBookmark('chapter1'), null);
 });
 
-interface Para { text: string; style: number; bold: boolean[]; color: string[] }
+interface Para { text: string; style: number; bold: boolean[]; color: string[]; numbering?: number }
 
 /** 문단 글·스타일·글자별 굵게/색만 가진 가짜 코어(구역 하나). 스타일 0 바탕글, 1~3 개요, 코드는 만들면 생긴다 */
 function fakeWasm(texts: string[]) {
@@ -52,6 +52,7 @@ function fakeWasm(texts: string[]) {
   const mk = (text: string, style = 0): Para => ({ text, style, bold: cp(text).map(() => false), color: cp(text).map(() => '') });
   const paras: Para[] = texts.map((t) => mk(t));
   const marks: Array<{ name: string; para: number }> = [];
+  const numberings: string[][] = [['^1.', '^2.', '^3.', '', '', '', '']];
   const calls: string[] = [];
   const w: CodeWasm = {
     getSectionCount: () => 1,
@@ -68,8 +69,16 @@ function fakeWasm(texts: string[]) {
     },
     updateStyle: () => true,
     updateStyleShapes: () => true,
-    applyParaFormat(_s, p, json) { calls.push(`para ${p} ${json}`); return '{"ok":true}'; },
-    getParaPropertiesAt: () => ({ paraShapeId: 9 }),
+    applyParaFormat(_s, p, json) {
+      calls.push(`para ${p} ${json}`);
+      const j = JSON.parse(json);
+      if (j.numberingId !== undefined) paras[p].numbering = j.numberingId;
+      return '{"ok":true}';
+    },
+    getParaPropertiesAt: (_s, p) => ({ paraShapeId: 9, headType: paras[p].style >= 1 && paras[p].style <= 3 ? 'Outline' : 'None', numberingId: paras[p].numbering }),
+    setParaShapeId(_s, p) { paras[p].numbering = 0; return '{"ok":true}'; },
+    getNumberingList: () => numberings.map((f, i) => ({ id: i + 1, levelFormats: f })),
+    createNumbering(json) { numberings.push(JSON.parse(json).levelFormats.length ? ['^1.'] : ['', '', '', '', '', '', '']); return numberings.length; },
     findOrCreateFontId: () => 5,
     applyCharFormat(_s, p, a, b, json) {
       const j = JSON.parse(json);
@@ -101,7 +110,7 @@ function fakeWasm(texts: string[]) {
     splitParagraph(_s, p, o) {
       const q = paras[p];
       const c = cp(q.text);
-      const tail: Para = { text: c.slice(o).join(''), style: q.style, bold: q.bold.slice(o), color: q.color.slice(o) };
+      const tail: Para = { text: c.slice(o).join(''), style: q.style, bold: q.bold.slice(o), color: q.color.slice(o), numbering: q.numbering };
       q.text = c.slice(0, o).join(''); q.bold = q.bold.slice(0, o); q.color = q.color.slice(0, o);
       paras.splice(p + 1, 0, tail);
       for (const m of marks) if (m.para > p) m.para++;
@@ -136,6 +145,19 @@ test('[lily] insertBlocks: 제목·본문 굵게·코드 블록을 문단마다,
   // 언어 바꾸기 = 책갈피 하나만(이름이 겹치지 않게 번호)
   assert.ok(setBlockLanguage(f.w, 0, 4, 'rust'));
   assert.deepEqual(f.marks, [{ name: '_lily_code_rust_1', para: 3 }]);
+});
+
+test('[lily] 규칙 제목 = 개요 스타일 + 번호 형식이 빈 정의(하나를 다시 쓴다), 직접 준 개요와 구분', () => {
+  const f = fakeWasm(['a', 'b', 'c']);
+  applyRuleHeading(f.w, 0, 0, 2);
+  applyRuleHeading(f.w, 0, 1, 1);
+  assert.equal(f.paras[0].numbering, 2);
+  assert.equal(f.paras[1].numbering, 2, '빈 번호 정의는 하나만 만든다');
+  assert.ok(isRuleHeading(f.w, 0, 0));
+  f.w.applyStyle(0, 2, 1);
+  assert.ok(!isRuleHeading(f.w, 0, 2), '사용자가 직접 준 개요');
+  applyBodyStyle(f.w, 0, 1);
+  assert.deepEqual([f.paras[1].style, f.paras[1].numbering], [0, 0]);
 });
 
 test('[lily] insertBlocks: 본문 한 블록은 캐럿 문단 스타일을 바꾸지 않는다(코드 줄에 글 넣기)', () => {

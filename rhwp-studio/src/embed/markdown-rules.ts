@@ -3,7 +3,7 @@
  *
  * LilyOffice 에이치독스(2026-11-10 M10)가 요청한 세 규칙이다. 조합(IME) 중에는 판단하지 않는다 — 공백은
  * `onInput` 의 비조합 분기에서만, Enter 는 본문 `case 'Enter'` 에서만 부른다(조합 중 Enter 는 확정만 한다).
- * - 문단 맨 앞 `# `~`### ` 뒤 공백 → 개요 1~3 스타일(접두어 삭제)
+ * - 문단 맨 앞 `# `~`### ` 뒤 공백 → 개요 1~3 스타일(접두어 삭제), 마크다운처럼 번호 없이. 그 제목 끝에서 Enter → 다음 문단은 바탕글
  * - `**글자**` 뒤 공백 → 굵게(별표 넷 삭제)
  * - 문단 전체가 ```` ```언어 ```` 일 때 Enter → 코드 블록('코드' 스타일 + 언어 책갈피). 빈 마지막 코드 줄에서 Enter → 바탕글로 빠져나오기
  * 변환은 snapshot 하나(= 실행 취소 한 단계). 변환 직후 Esc(또는 Ctrl/Cmd+Z 한 번)는 변환만 되돌려 원문이 남는다.
@@ -12,7 +12,8 @@ import type { DocumentPosition } from '../core/types.ts';
 import type { WasmBridge } from '../core/wasm-bridge.ts';
 import type { InputHandler } from '../engine/input-handler.ts';
 import {
-  applyCodeStyle, clearCodeLanguage, codeStyleId, findOutlineStyleId, sanitizeLanguage, setBlockLanguage, type CodeWasm,
+  applyBodyStyle, applyCodeStyle, applyRuleHeading, clearCodeLanguage, codeStyleId, findOutlineStyleId, isRuleHeading,
+  sanitizeLanguage, setBlockLanguage, type CodeWasm,
 } from './code-blocks.ts';
 
 export const MARKDOWN_OPERATION = 'lilyMarkdown';
@@ -96,7 +97,7 @@ export class MarkdownRules {
       this.run((wasm) => {
         const w = wasm as unknown as CodeWasm;
         w.deleteText(sec, para, 0, rule.level + 1);
-        w.applyStyle(sec, para, styleId);
+        applyRuleHeading(w, sec, para, styleId);
         return { sectionIndex: sec, paragraphIndex: para, charOffset: 0 };
       });
       return;
@@ -130,6 +131,22 @@ export class MarkdownRules {
       });
       return true;
     }
+    // 규칙으로 만든 제목 끝에서 Enter → 다음 문단은 바탕글(마크다운처럼). 사용자가 직접 준 개요는 한글 관례 그대로
+    if (len > 0 && isRuleHeading(w, sec, para)) {
+      this.ih.executeOperation({
+        kind: 'snapshot',
+        operationType: 'lilyHeadingEnter',
+        operation: (wasm) => {
+          const cw = wasm as unknown as CodeWasm;
+          const r = JSON.parse(cw.splitParagraph(sec, para, off)) as { ok?: boolean; paraIdx?: number };
+          if (!r.ok || typeof r.paraIdx !== 'number') return null;
+          applyBodyStyle(cw, sec, r.paraIdx);
+          return { sectionIndex: sec, paragraphIndex: r.paraIdx, charOffset: 0 };
+        },
+      });
+      this.last = null;
+      return true;
+    }
     // 빈 마지막 코드 줄 → 바탕글로 빠져나오기
     const codeId = codeStyleId(w);
     if (codeId < 0 || len !== 0 || w.getStyleAt(sec, para).id !== codeId) return false;
@@ -138,7 +155,7 @@ export class MarkdownRules {
     this.run((wasm) => {
       const cw = wasm as unknown as CodeWasm;
       clearCodeLanguage(cw, sec, para, para);
-      cw.applyStyle(sec, para, 0);
+      applyBodyStyle(cw, sec, para);
       return { sectionIndex: sec, paragraphIndex: para, charOffset: 0 };
     });
     return true;
