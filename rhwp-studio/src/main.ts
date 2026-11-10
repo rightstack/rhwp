@@ -69,7 +69,7 @@ import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { insertTextAt } from '@/embed/text-ops';
 import { MarkdownRules } from '@/embed/markdown-rules';
 import {
-  applyInsertBlocks, codeContextAt, listCodeBlocks, setBlockLanguage, type CodeWasm,
+  applyInsertBlocks, codeContextAt, listCodeBlocks, paintCode, setBlockLanguage, UNRECORDED_REASON, type CodeWasm,
 } from '@/embed/code-blocks';
 import { FONT_RULE_WEBFONT_ENTRIES } from '@/core/font-rule-runtime';
 import { setDocumentFontSubstitutions } from '@/core/font-substitution';
@@ -1248,6 +1248,8 @@ function setupEventListeners(): void {
   });
 
   eventBus.on('document-changed', (reason) => {
+    // [lily] 기록 없는 칠하기(code.paint)는 화면만 바꾼다 — dirty 로 치지 않는다
+    if (reason === UNRECORDED_REASON) return;
     documentState.markDirty(typeof reason === 'string' ? reason : 'document-changed');
   });
 
@@ -2357,6 +2359,13 @@ installEmbedRuntime({
         },
       });
       return { ok };
+    },
+    async codePaint(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { painted: 0 };
+      let painted = 0;
+      inputHandler.applyUnrecorded((w) => (painted = paintCode(w as unknown as CodeWasm, req)) > 0);
+      return { painted };
     },
   },
 });

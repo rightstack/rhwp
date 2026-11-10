@@ -420,6 +420,11 @@ export declare class RhwpEditor {
     context(): Promise<{ section: number; paragraph: number; count: number; lang: string } | null>;
     /** 실행 취소 한 단계 */
     setLanguage(section: number, paragraph: number, lang: string): Promise<{ ok: boolean }>;
+    /** 문법 강조 칠하기 — 실행 취소 기록·dirty 없음. text 가 지금 문단 글과 다르면 그 문단은 건너뛴다. 오프셋 = 코어 단위 */
+    paint(section: number, paragraphs: Array<{
+      paragraph: number; text: string;
+      runs: Array<{ start: number; end: number; color: string; bold?: boolean; italic?: boolean }>;
+    }>): Promise<{ painted: number }>;
   };
 
   /** 상태 표시줄 값 */

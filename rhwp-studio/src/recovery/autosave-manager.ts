@@ -113,6 +113,8 @@ export class AutosaveManager {
       this.schedule(reasonText(reason, 'document-mutated'));
     });
     const offChanged = eventBus.on('document-changed', (reason) => {
+      // [lily] 기록 없는 칠하기(embed code.paint)는 자동 저장 거리가 아니다
+      if (reason === 'lily-unrecorded') return;
       this.schedule(reasonText(reason, 'document-changed'));
     });
 

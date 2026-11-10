@@ -531,6 +531,7 @@ export class RhwpEditor {
       blocks: () => this._request('code.blocks'),
       context: () => this._request('code.context'),
       setLanguage: (section, paragraph, lang) => this._request('code.setLanguage', { section, paragraph, lang }),
+      paint: (section, paragraphs) => this._request('code.paint', { section, paragraphs }),
     };
   }
 

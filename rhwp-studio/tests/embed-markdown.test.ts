@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { routeEmbedRequest, type EmbedRpcHandlers } from '../src/embed/rpc-router.ts';
 import { detectFence, detectSpaceRule } from '../src/embed/markdown-rules.ts';
 import {
-  applyInsertBlocks, codeContextAt, languageOfBookmark, listCodeBlocks, parseInsertBlocks,
+  applyInsertBlocks, codeContextAt, languageOfBookmark, listCodeBlocks, paintCode, parseCodePaint, parseInsertBlocks,
   sanitizeLanguage, setBlockLanguage, type CodeWasm,
 } from '../src/embed/code-blocks.ts';
 
@@ -148,6 +148,22 @@ test('[lily] insertBlocks: 본문 한 블록은 캐럿 문단 스타일을 바�
   assert.equal(applyInsertBlocks(f.w, { section: 0, paragraph: 9, offset: 0 }, [{ text: 'q' }]), null);
 });
 
+test('[lily] code.paint: 코드 문단만, 글이 기대와 같을 때만 칠한다', () => {
+  const f = fakeWasm(['']);
+  applyInsertBlocks(f.w, { section: 0, paragraph: 0, offset: 0 }, [{ text: 'let a', style: 'code', lang: 'js' }, { text: '본문' }]);
+  const n = paintCode(f.w, parseCodePaint({
+    section: 0,
+    paragraphs: [
+      { paragraph: 0, text: 'let a', runs: [{ start: 0, end: 3, color: '#CF222E', bold: true }, { start: 3, end: 5, color: '#1f2328' }] },
+      { paragraph: 1, text: '본문', runs: [{ start: 0, end: 2, color: '#cf222e' }] },
+      { paragraph: 0, text: 'stale', runs: [{ start: 0, end: 1, color: '#000000' }] },
+    ],
+  }));
+  assert.equal(n, 1);
+  assert.deepEqual(f.paras[0].color, ['#cf222e', '#cf222e', '#cf222e', '#1f2328', '#1f2328']);
+  assert.deepEqual(f.paras[0].bold, [true, true, true, false, false]);
+  assert.deepEqual(f.paras[1].color, ['', '']);
+});
 
 test('[lily] 라우터: markdown.*·text.insertBlocks·code.* 인자 검증', async () => {
   const seen: unknown[] = [];
@@ -163,6 +179,9 @@ test('[lily] 라우터: markdown.*·text.insertBlocks·code.* 인자 검증', as
   await assert.rejects(routeEmbedRequest('text.insertBlocks', { blocks: [{ text: 'ab', bold: [[1, 3]] }] }, handlers), /out of text/);
   await routeEmbedRequest('code.setLanguage', { section: 0, paragraph: 2, lang: 'Python' }, handlers);
   await assert.rejects(routeEmbedRequest('code.setLanguage', { section: 0, paragraph: -1, lang: 'x' }, handlers), /paragraph/);
+  await assert.rejects(routeEmbedRequest('code.paint', { section: 0, paragraphs: [{ paragraph: 0, text: '', runs: [{ start: 1, end: 1, color: '#000000' }] }] }, handlers), /greater/);
+  await assert.rejects(routeEmbedRequest('code.paint', { section: 0, paragraphs: [{ paragraph: 0, text: '', runs: [{ start: 0, end: 1, color: 'red' }] }] }, handlers), /rrggbb/);
+  await assert.rejects(routeEmbedRequest('code.paint', { section: 0, paragraphs: [], extra: 1 }, handlers), /unknown field/);
   assert.deepEqual(seen, [
     ['markdownSetRules', { enabled: true }],
     ['textInsertBlocks', { blocks: [{ text: 'a', style: 'outline1' }] }],

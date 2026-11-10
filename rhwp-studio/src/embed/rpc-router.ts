@@ -26,7 +26,7 @@ import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoIns
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
 import { parseMarkdownRules } from './markdown-rules.ts';
 import {
-  parseInsertBlocks, sanitizeLanguage, type CodeBlockInfoV1, type InsertBlockV1,
+  parseCodePaint, parseInsertBlocks, sanitizeLanguage, type CodeBlockInfoV1, type CodePaintV1, type InsertBlockV1,
 } from './code-blocks.ts';
 import type {
   CanvasKitRenderModeRequest,
@@ -127,6 +127,8 @@ export interface EmbedRpcHandlers {
   codeContext(): Promise<{ section: number; paragraph: number; count: number; lang: string } | null>;
   /** 블록 언어 바꾸기(실행 취소 한 단계) */
   codeSetLanguage(req: { section: number; paragraph: number; lang: string }): Promise<{ ok: boolean }>;
+  /** 문법 강조 칠하기 — 실행 취소 기록·dirty 없음 */
+  codePaint(req: CodePaintV1): Promise<{ painted: number }>;
 }
 
 /** 본문 문단 안 [start, end) 글자(문단 오프셋) */
@@ -373,6 +375,9 @@ export async function routeEmbedRequest(
       if (typeof params.lang !== 'string') throw new Error('lang must be a string');
       return handlers.codeSetLanguage({ section: range.section, paragraph: range.paragraph, lang: sanitizeLanguage(params.lang) });
     }
+    case 'code.paint':
+      assertOnlyKeys(params, ['section', 'paragraphs'], 'code.paint params');
+      return handlers.codePaint(parseCodePaint(params));
     default: throw new Error(`Unknown method: ${method}`);
   }
 }

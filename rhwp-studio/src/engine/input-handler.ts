@@ -5518,6 +5518,20 @@ export class InputHandler {
   /** [lily] 실행 취소 꼭대기 명령(같은 객체인지로 "직전 동작"을 판정한다 — 마크다운 규칙 Esc 되돌리기) */
   peekUndoCommand(): EditCommand | null { return this.history.peekUndoTop(); }
 
+  /**
+   * [lily] 실행 취소 기록·dirty 없이 문서를 고친다(코드 문법 강조 칠하기 — embed `code.paint`).
+   * 화면만 다시 그린다: `document-changed` 를 이유 'lily-unrecorded' 로 낸다(main.ts·자동 저장은 이 이유를 건너뛴다).
+   * `document-mutated` 는 내지 않으므로 문서 에이전트 changeSeq 도 그대로다.
+   */
+  applyUnrecorded(op: (wasm: WasmBridge) => boolean): boolean {
+    this.flushDeferredPaginationIfNeeded('before-full-edit', false);
+    const changed = op(this.wasm);
+    if (changed) {
+      this.eventBus.emit('document-changed', 'lily-unrecorded');
+      this.updateCaret();
+    }
+    return changed;
+  }
 
   /** Redo 실행 (커맨드 시스템용) */
   performRedo(): void { this.handleRedo(); }

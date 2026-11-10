@@ -4,6 +4,7 @@
  * 모델: 연속한 '코드' 사용자 스타일 본문 문단 = 블록 하나. 스타일 = 나눔고딕코딩 + 문단 바탕(#f6f8fa, 위아래 문단과
  * 이어짐). 1x1 표는 쓰지 않는다. 언어 = 블록 문단 안의 책갈피 `_lily_code_<lang>_<n>`(책갈피는 hwp·hwpx 저장 왕복에서
  * 남는다 — serializer/control.rs·serializer/hwpx/field.rs, 이름이 겹치면 core 가 거부하므로 번호를 붙인다).
+ * 문법 강조는 호스트가 계산해 `code.paint` 로 칠한다 — 실행 취소 기록·dirty 없이(applyUnrecorded).
  */
 import type { DocumentPosition } from '../core/types.ts';
 
@@ -12,8 +13,12 @@ export const CODE_STYLE_ENGLISH = 'Code';
 export const CODE_FONT = '나눔고딕코딩';
 export const CODE_BACKGROUND = '#f6f8fa';
 export const CODE_BOOKMARK_PREFIX = '_lily_code_';
+/** applyUnrecorded 가 내는 document-changed 이유 — main.ts·autosave 는 dirty·자동 저장을 하지 않는다 */
+export const UNRECORDED_REASON = 'lily-unrecorded';
 export const MAX_INSERT_BLOCKS = 5000;
 export const MAX_BLOCK_TEXT = 20000;
+export const MAX_PAINT_PARAGRAPHS = 5000;
+export const MAX_PAINT_RUNS = 2000;
 
 /** 코드 블록 연산이 쓰는 코어 메서드(WasmBridge 의 일부 — 테스트는 가짜로 채운다) */
 export interface CodeWasm {
@@ -194,6 +199,65 @@ export function codeContextAt(w: CodeWasm, pos: DocumentPosition | null): { sect
   return { section: sec, paragraph: block.start, count: block.end - block.start + 1, lang: mark ? languageOfBookmark(mark.name)! : 'plain' };
 }
 
+// ── code.paint ──────────────────────────────────────────────
+
+export interface CodePaintRunV1 {
+  /** 문단 안 글자 오프셋(코어 단위 = 유니코드 scalar) [start, end) */
+  start: number;
+  end: number;
+  /** #rrggbb */
+  color: string;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export interface CodePaintV1 {
+  section: number;
+  paragraphs: Array<{ paragraph: number; /** 칠할 때 기대한 문단 글 — 다르면 그 문단은 건너뛴다(편집 경합) */ text: string; runs: CodePaintRunV1[] }>;
+}
+
+export function parseCodePaint(value: Record<string, unknown>): CodePaintV1 {
+  const section = index(value.section, 'section');
+  if (!Array.isArray(value.paragraphs) || value.paragraphs.length > MAX_PAINT_PARAGRAPHS) {
+    throw new Error(`paragraphs must be an array (max ${MAX_PAINT_PARAGRAPHS})`);
+  }
+  const paragraphs = value.paragraphs.map((raw, i) => {
+    const p = record(raw, `paragraphs[${i}]`);
+    if (typeof p.text !== 'string') throw new Error(`paragraphs[${i}].text must be a string`);
+    if (!Array.isArray(p.runs) || p.runs.length > MAX_PAINT_RUNS) throw new Error(`paragraphs[${i}].runs must be an array (max ${MAX_PAINT_RUNS})`);
+    const runs = p.runs.map((rr, j) => {
+      const r = record(rr, `runs[${j}]`);
+      const start = index(r.start, 'run.start');
+      const end = index(r.end, 'run.end');
+      if (end <= start) throw new Error('run.end must be greater than run.start');
+      if (typeof r.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(r.color)) throw new Error('run.color must be #rrggbb');
+      if (r.bold !== undefined && typeof r.bold !== 'boolean') throw new Error('run.bold must be a boolean');
+      if (r.italic !== undefined && typeof r.italic !== 'boolean') throw new Error('run.italic must be a boolean');
+      return { start, end, color: r.color.toLowerCase(), bold: r.bold === true, italic: r.italic === true };
+    });
+    return { paragraph: index(p.paragraph, 'paragraph'), text: p.text, runs };
+  });
+  return { section, paragraphs };
+}
+
+/** 코드 문단의 글자 범위에 색·굵게·기울임. 실행 취소 기록 없이(호출자가 applyUnrecorded 로 감싼다). 칠한 문단 수 */
+export function paintCode(w: CodeWasm, req: CodePaintV1): number {
+  const codeId = codeStyleId(w);
+  if (codeId < 0 || req.section >= w.getSectionCount()) return 0;
+  const count = w.getParagraphCount(req.section);
+  let painted = 0;
+  for (const p of req.paragraphs) {
+    if (p.paragraph >= count || w.getStyleAt(req.section, p.paragraph).id !== codeId) continue;
+    if (paragraphText(w, req.section, p.paragraph) !== p.text) continue;
+    const len = cc(p.text);
+    for (const r of p.runs) {
+      if (r.end > len) break;
+      w.applyCharFormat(req.section, p.paragraph, r.start, r.end, JSON.stringify({ textColor: r.color, bold: r.bold === true, italic: r.italic === true }));
+    }
+    painted++;
+  }
+  return painted;
+}
 
 function index(value: unknown, label: string): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error(`${label} must be a non-negative safe integer`);
