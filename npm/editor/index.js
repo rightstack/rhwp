@@ -169,10 +169,11 @@ export class RhwpEditor {
   /**
    * 특정 페이지를 SVG 문자열로 렌더링합니다.
    * @param page - 0부터 시작하는 페이지 번호
+   * @param options - [lily] `{ profile: 'print' }` = 조판 부호 등 화면 전용 표시 없이
    * @returns SVG 문자열
    */
-  async getPageSvg(page = 0) {
-    return this._request('getPageSvg', { page });
+  async getPageSvg(page = 0, options = {}) {
+    return this._request('getPageSvg', options.profile ? { page, profile: options.profile } : { page });
   }
 
   /**

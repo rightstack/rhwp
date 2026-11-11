@@ -2128,9 +2128,9 @@ installEmbedRuntime({
         },
       );
     },
-    async getPageSvg(page) {
+    async getPageSvg(page, profile) {
       await initPromise;
-      return wasm.renderPageSvg(page);
+      return profile ? wasm.renderPageSvgWithProfile(page, profile) : wasm.renderPageSvg(page);
     },
     async exportHwp() {
       await initPromise;

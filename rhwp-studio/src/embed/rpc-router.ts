@@ -52,7 +52,7 @@ export interface EmbedRpcHandlers {
   pageCount(): Promise<number>;
   getRendererDiagnostics(page: number): Promise<EmbedRendererDiagnosticsV1>;
   getFontDecisionTrace(page: number, maxCharacters: number): Promise<EmbedFontDecisionTraceV1>;
-  getPageSvg(page: number): Promise<string>;
+  getPageSvg(page: number, profile?: 'screen' | 'print'): Promise<string>;
   exportHwp(): Promise<Uint8Array>;
   exportHwpx(): Promise<Uint8Array>;
   exportHml(): Promise<Uint8Array>;
@@ -294,9 +294,13 @@ export async function routeEmbedRequest(
       }
       return handlers.getFontDecisionTrace(page as number, maxCharacters as number);
     }
-    case 'getPageSvg': return handlers.getPageSvg(
-      typeof params.page === 'number' ? params.page : 0,
-    );
+    case 'getPageSvg': {
+      // [lily] profile 'print' = 조판 부호 등 화면 전용 표시 없이(인자 없으면 예전과 같음)
+      if (params.profile !== undefined && params.profile !== 'screen' && params.profile !== 'print') {
+        throw new Error("profile must be 'screen' or 'print'");
+      }
+      return handlers.getPageSvg(typeof params.page === 'number' ? params.page : 0, params.profile);
+    }
     case 'exportHwp': return handlers.exportHwp();
     case 'exportHwpx': return handlers.exportHwpx();
     case 'exportHml': return handlers.exportHml();
