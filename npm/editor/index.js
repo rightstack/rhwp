@@ -504,6 +504,16 @@ export class RhwpEditor {
   }
 
   /**
+   * 표 — `insert()` 는 캐럿(선택이 있으면 그 시작) 자리에 표를 만들고 `cells[행][열]` 의 글을 칸에 넣습니다.
+   * 실행 취소 한 단계입니다. 캐럿이 본문 문단이 아니면(표 안·머리말 등) ok: false. 캐럿은 표 다음 문단의 처음으로 갑니다.
+   */
+  get table() {
+    return {
+      insert: (rows, cols, cells) => this._request('table.insert', cells === undefined ? { rows, cols } : { rows, cols, cells }),
+    };
+  }
+
+  /**
    * 본문 위치(구역·문단·글자 오프셋)에 글을 넣습니다. `\n` 마다 문단을 나눕니다. 실행 취소 한 단계입니다.
    * 좌표가 본문 문단 밖이면 `{ ok: false }`.
    */

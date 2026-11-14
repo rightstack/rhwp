@@ -104,3 +104,24 @@ test('[lily] memo.insert·memo.edit 인자를 검증한다', async () => {
     await assert.rejects(() => routeEmbedRequest(method, params, handlers));
   }
 });
+
+test('[lily] table.insert 인자를 검증한다', async () => {
+  const calls: unknown[] = [];
+  const handlers = { tableInsert: async (r: unknown) => { calls.push(r); return { ok: true, paragraph: 2, rows: 1, cols: 2 }; } } as unknown as EmbedRpcHandlers;
+  assert.deepEqual(await routeEmbedRequest('table.insert', { rows: 1, cols: 2, cells: [['학년', '']] }, handlers), { ok: true, paragraph: 2, rows: 1, cols: 2 });
+  await routeEmbedRequest('table.insert', { rows: 3, cols: 4 }, handlers);
+  assert.deepEqual(calls, [{ rows: 1, cols: 2, cells: [['학년', '']] }, { rows: 3, cols: 4 }]);
+  for (const bad of [
+    { rows: 0, cols: 2 },
+    { rows: 2, cols: 21 },
+    { rows: 1.5, cols: 2 },
+    { rows: 1, cols: 2, cells: [['a', 'b', 'c']] },
+    { rows: 1, cols: 2, cells: [['a'], ['b']] },
+    { rows: 1, cols: 2, cells: [['줄\n바꿈']] },
+    { rows: 1, cols: 2, cells: [[3]] },
+    { rows: 1, cols: 2, cells: 'x' },
+    { rows: 1, cols: 2, extra: 1 },
+  ]) {
+    await assert.rejects(() => routeEmbedRequest('table.insert', bad, handlers), JSON.stringify(bad));
+  }
+});

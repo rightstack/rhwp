@@ -23,6 +23,7 @@ import {
   type EmbedParaFormatV1,
 } from './format-bridge.ts';
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
+import { parseTableInsert, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
 import { parseMarkdownRules } from './markdown-rules.ts';
 import {
@@ -112,6 +113,9 @@ export interface EmbedRpcHandlers {
   memoInsert(req: EmbedMemoInsertV1): Promise<{ ok: boolean; memoIndex?: number }>;
   /** 메모 번호로 글 바꾸기 */
   memoEdit(req: EmbedMemoEditV1): Promise<{ ok: boolean }>;
+
+  // ── [lily] 캐럿 자리에 표 만들기 + 칸의 글(실행 취소 한 단계) ──
+  tableInsert(req: EmbedTableInsertV1): Promise<EmbedTableInsertResultV1>;
 
   // ── [lily] 본문 위치에 글 넣기(줄바꿈 = 문단 나누기, 실행 취소 한 단계) ──
   textInsert(req: EmbedTextInsertV1): Promise<EmbedTextInsertResultV1>;
@@ -362,6 +366,9 @@ export async function routeEmbedRequest(
     case 'memo.edit':
       assertOnlyKeys(params, ['memoIndex', 'text'], 'memo.edit params');
       return handlers.memoEdit(parseMemoEdit(params));
+    case 'table.insert':
+      assertOnlyKeys(params, ['rows', 'cols', 'cells'], 'table.insert params');
+      return handlers.tableInsert(parseTableInsert(params));
     case 'text.insert':
       assertOnlyKeys(params, ['section', 'paragraph', 'offset', 'text'], 'text.insert params');
       return handlers.textInsert(parseTextInsert(params));
