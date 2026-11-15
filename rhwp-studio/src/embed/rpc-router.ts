@@ -367,7 +367,7 @@ export async function routeEmbedRequest(
       assertOnlyKeys(params, ['memoIndex', 'text'], 'memo.edit params');
       return handlers.memoEdit(parseMemoEdit(params));
     case 'table.insert':
-      assertOnlyKeys(params, ['rows', 'cols', 'cells'], 'table.insert params');
+      assertOnlyKeys(params, ['rows', 'cols', 'cells', 'widthsMm', 'heightsMm', 'format'], 'table.insert params');
       return handlers.tableInsert(parseTableInsert(params));
     case 'text.insert':
       assertOnlyKeys(params, ['section', 'paragraph', 'offset', 'text'], 'text.insert params');

@@ -400,7 +400,14 @@ export declare class RhwpEditor {
      * 캐럿(선택이 있으면 그 시작) 자리에 rows × cols 표. `cells[행][열]` = 칸의 글(줄바꿈 없는 한 문단, 없으면 빈 칸).
      * 본문 문단이 아니면 ok: false. `paragraph` = 표가 들어간 본문 문단 번호
      */
-    insert(rows: number, cols: number, cells?: string[][]): Promise<{ ok: boolean; paragraph?: number; rows?: number; cols?: number }>;
+    insert(rows: number, cols: number, cells?: string[][], look?: {
+      widthsMm?: number[];
+      heightsMm?: number[];
+      format?: Array<{
+        rows?: [number, number]; cols?: [number, number]; fill?: string; border?: { color: string; width?: number; type?: number };
+        vAlign?: 'top' | 'center' | 'bottom'; bold?: boolean; color?: string; sizePt?: number; align?: 'left' | 'center' | 'right' | 'justify';
+      }>;
+    }): Promise<{ ok: boolean; paragraph?: number; rows?: number; cols?: number }>;
   };
 
   /** 본문 위치에 글 넣기(`\n` = 문단 나누기, 실행 취소 한 단계). 좌표가 본문 문단 밖이면 ok: false.

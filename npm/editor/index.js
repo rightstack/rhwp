@@ -509,7 +509,8 @@ export class RhwpEditor {
    */
   get table() {
     return {
-      insert: (rows, cols, cells) => this._request('table.insert', cells === undefined ? { rows, cols } : { rows, cols, cells }),
+      // [lily] look = { widthsMm?, heightsMm?, format? } — 칸 너비 · 줄 높이 · 범위별 꾸밈(바탕 · 테두리 · 맞춤 · 글자)
+      insert: (rows, cols, cells, look) => this._request('table.insert', { rows, cols, ...(cells !== undefined && { cells }), ...(look ?? {}) }),
     };
   }
 

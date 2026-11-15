@@ -5,6 +5,11 @@
  * 대화 상자를 띄울 수 없어 표가 있는 문서를 만들지 못했다. 캐럿 자리에 표를 만들고 칸의 글까지 한 번에 넣는다.
  * snapshot 라우팅 하나(대화 상자의 표 만들기와 같은 길)라 실행 취소 한 단계이고 dirty·자동 저장이 따라온다.
  * 칸의 글은 줄바꿈 없는 한 문단이다(칸 안 문단 나누기는 하지 않는다).
+ *
+ * [lily] 칸 꾸밈(2026-11-15): 같은 호출에서 칸 너비 · 줄 높이와 범위별 꾸밈(바탕색 · 테두리 · 세로 맞춤 · 글자 굵기/색/크기 ·
+ * 문단 맞춤)을 준다 — 표 › 셀 속성 대화 상자와 글자/문단 모양이 쓰는 것과 같은 wasm 함수(setCellProperties ·
+ * applyCharFormatInCell · applyParaFormatInCell)이고, 표 만들기와 한 실행 취소 단계다. 호스트는 대화 상자를 띄울 수 없어
+ * 꾸민 표(머리 줄에 색이 있는 표, 양식)를 만들 길이 없었다.
  */
 import type { InputHandler } from '../engine/input-handler.ts';
 
@@ -12,11 +17,35 @@ export const MAX_TABLE_ROWS = 60;
 export const MAX_TABLE_COLS = 20;
 export const MAX_CELL_TEXT = 1000;
 
+export const MAX_CELL_FORMATS = 64;
+
+/** 칸 꾸밈 하나: 줄 · 칸 범위(0부터, 끝 포함, 없으면 전부)에 준다. 뒤의 것이 앞의 것을 덮는다 */
+export interface EmbedCellFormatV1 {
+  rows?: [number, number];
+  cols?: [number, number];
+  /** 바탕색 #rrggbb */
+  fill?: string;
+  /** 네 변 테두리. width = 굵기 번호 0–6(기본 1), type = 선 종류(0 없음 · 1 실선 …, 기본 1) */
+  border?: { color: string; width?: number; type?: number };
+  vAlign?: 'top' | 'center' | 'bottom';
+  bold?: boolean;
+  /** 글자색 #rrggbb */
+  color?: string;
+  /** 글자 크기(pt) */
+  sizePt?: number;
+  align?: 'left' | 'center' | 'right' | 'justify';
+}
+
 export interface EmbedTableInsertV1 {
   rows: number;
   cols: number;
   /** 칸의 글: `cells[행][열]`. 없거나 모자란 칸은 빈 칸 */
   cells?: string[][];
+  /** 칸 너비(mm), 칸 차례대로. 모자란 칸은 그대로 */
+  widthsMm?: number[];
+  /** 줄 높이(mm), 줄 차례대로. 모자란 줄은 그대로 */
+  heightsMm?: number[];
+  format?: EmbedCellFormatV1[];
 }
 
 export interface EmbedTableInsertResultV1 {
@@ -34,10 +63,81 @@ const count = (value: unknown, max: number, name: string): number => {
   return value as number;
 };
 
+const COLOR = /^#[0-9a-fA-F]{6}$/;
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+function parseSizes(value: unknown, max: number, name: string): number[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > max || !value.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 500)) {
+    throw new Error(`${name} must be an array of at most ${max} numbers from 1 to 500 (mm)`);
+  }
+  return value as number[];
+}
+
+function parseRange(value: unknown, max: number, name: string): [number, number] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length !== 2 || !value.every((v) => Number.isSafeInteger(v)) || value[0] < 0 || value[1] < value[0] || value[1] >= max) {
+    throw new Error(`${name} must be [from, to] inside the table (0-based, inclusive)`);
+  }
+  return [value[0] as number, value[1] as number];
+}
+
+function parseFormats(value: unknown, rows: number, cols: number): EmbedCellFormatV1[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > MAX_CELL_FORMATS) throw new Error(`format must be an array of at most ${MAX_CELL_FORMATS} entries`);
+  return value.map((raw, i) => {
+    const at = `format[${i}]`;
+    if (!isRecord(raw)) throw new Error(`${at} must be an object`);
+    for (const k of Object.keys(raw)) {
+      if (!['rows', 'cols', 'fill', 'border', 'vAlign', 'bold', 'color', 'sizePt', 'align'].includes(k)) throw new Error(`${at}.${k} is not a known field`);
+    }
+    const out: EmbedCellFormatV1 = {};
+    const r = parseRange(raw.rows, rows, `${at}.rows`);
+    const c = parseRange(raw.cols, cols, `${at}.cols`);
+    if (r) out.rows = r;
+    if (c) out.cols = c;
+    for (const k of ['fill', 'color'] as const) {
+      if (raw[k] === undefined) continue;
+      if (typeof raw[k] !== 'string' || !COLOR.test(raw[k] as string)) throw new Error(`${at}.${k} must be #rrggbb`);
+      out[k] = raw[k] as string;
+    }
+    if (raw.border !== undefined) {
+      const b = raw.border;
+      if (!isRecord(b) || typeof b.color !== 'string' || !COLOR.test(b.color)) throw new Error(`${at}.border.color must be #rrggbb`);
+      for (const k of Object.keys(b)) if (!['color', 'width', 'type'].includes(k)) throw new Error(`${at}.border.${k} is not a known field`);
+      for (const [k, max] of [['width', 6], ['type', 16]] as const) {
+        if (b[k] !== undefined && (!Number.isSafeInteger(b[k]) || (b[k] as number) < 0 || (b[k] as number) > max)) throw new Error(`${at}.border.${k} must be an integer from 0 to ${max}`);
+      }
+      out.border = { color: b.color, ...(b.width !== undefined && { width: b.width as number }), ...(b.type !== undefined && { type: b.type as number }) };
+    }
+    if (raw.vAlign !== undefined) {
+      if (!['top', 'center', 'bottom'].includes(raw.vAlign as string)) throw new Error(`${at}.vAlign must be top, center or bottom`);
+      out.vAlign = raw.vAlign as EmbedCellFormatV1['vAlign'];
+    }
+    if (raw.align !== undefined) {
+      if (!['left', 'center', 'right', 'justify'].includes(raw.align as string)) throw new Error(`${at}.align must be left, center, right or justify`);
+      out.align = raw.align as EmbedCellFormatV1['align'];
+    }
+    if (raw.bold !== undefined) {
+      if (typeof raw.bold !== 'boolean') throw new Error(`${at}.bold must be true or false`);
+      out.bold = raw.bold;
+    }
+    if (raw.sizePt !== undefined) {
+      if (typeof raw.sizePt !== 'number' || !Number.isFinite(raw.sizePt) || raw.sizePt < 1 || raw.sizePt > 200) throw new Error(`${at}.sizePt must be a number from 1 to 200`);
+      out.sizePt = raw.sizePt;
+    }
+    return out;
+  });
+}
+
 export function parseTableInsert(value: Record<string, unknown>): EmbedTableInsertV1 {
   const rows = count(value.rows, MAX_TABLE_ROWS, 'rows');
   const cols = count(value.cols, MAX_TABLE_COLS, 'cols');
-  if (value.cells === undefined) return { rows, cols };
+  const widthsMm = parseSizes(value.widthsMm, cols, 'widthsMm');
+  const heightsMm = parseSizes(value.heightsMm, rows, 'heightsMm');
+  const format = parseFormats(value.format, rows, cols);
+  const look = { ...(widthsMm && { widthsMm }), ...(heightsMm && { heightsMm }), ...(format && { format }) };
+  if (value.cells === undefined) return { rows, cols, ...look };
   if (!Array.isArray(value.cells) || value.cells.length > rows) throw new Error(`cells must be an array of at most ${rows} rows`);
   const cells = value.cells.map((row, r) => {
     if (!Array.isArray(row) || row.length > cols) throw new Error(`cells[${r}] must be an array of at most ${cols} texts`);
@@ -49,7 +149,35 @@ export function parseTableInsert(value: Record<string, unknown>): EmbedTableInse
       return text;
     });
   });
-  return { rows, cols, cells };
+  return { rows, cols, cells, ...look };
+}
+
+/** mm → HWPUNIT(1/7200 인치) */
+const hwpunit = (mm: number) => Math.round((mm * 7200) / 25.4);
+const V_ALIGN = { top: 0, center: 1, bottom: 2 } as const;
+
+/** 칸 하나에 줄 꾸밈: 칸 속성(너비 · 높이 · 바탕 · 테두리 · 세로 맞춤)과 글자 · 문단 모양. 범위에 드는 꾸밈을 차례로 겹친다 */
+function lookOf(req: EmbedTableInsertV1, row: number, col: number): { props: Record<string, unknown>; char: Record<string, unknown>; align?: string } {
+  const props: Record<string, unknown> = {};
+  const char: Record<string, unknown> = {};
+  let align: string | undefined;
+  if (req.widthsMm?.[col] !== undefined) props.width = hwpunit(req.widthsMm[col]!);
+  if (req.heightsMm?.[row] !== undefined) props.height = hwpunit(req.heightsMm[row]!);
+  for (const f of req.format ?? []) {
+    if (f.rows && (row < f.rows[0] || row > f.rows[1])) continue;
+    if (f.cols && (col < f.cols[0] || col > f.cols[1])) continue;
+    if (f.fill) { props.fillType = 'solid'; props.fillColor = f.fill.toLowerCase(); }
+    if (f.border) {
+      const line = { type: f.border.type ?? 1, width: f.border.width ?? 1, color: f.border.color.toLowerCase() };
+      props.borderLeft = line; props.borderRight = line; props.borderTop = line; props.borderBottom = line;
+    }
+    if (f.vAlign) props.verticalAlign = V_ALIGN[f.vAlign];
+    if (f.bold !== undefined) char.bold = f.bold;
+    if (f.color) char.textColor = f.color.toLowerCase();
+    if (f.sizePt !== undefined) char.fontSize = Math.round(f.sizePt * 100);
+    if (f.align) align = f.align;
+  }
+  return { props, char, ...(align && { align }) };
 }
 
 /** 캐럿(선택이 있으면 그 시작) 자리에 표를 만들고 칸의 글을 넣는다. 본문 문단이 아니면(표 안·머리말 등) ok: false */
@@ -68,6 +196,19 @@ export function insertTableAtCaret(ih: InputHandler, req: EmbedTableInsertV1): E
       (req.cells ?? []).forEach((row, ri) => row.forEach((text, ci) => {
         if (text) wasm.insertTextInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, ri * req.cols + ci, 0, 0, text);
       }));
+      // [lily] 칸 꾸밈: 글을 넣은 뒤에(글자 모양은 들어 있는 글에 준다)
+      if (req.widthsMm || req.heightsMm || req.format) {
+        for (let ri = 0; ri < req.rows; ri += 1) {
+          for (let ci = 0; ci < req.cols; ci += 1) {
+            const cell = ri * req.cols + ci;
+            const { props, char, align } = lookOf(req, ri, ci);
+            if (Object.keys(props).length) wasm.setCellProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, props);
+            const len = (req.cells?.[ri]?.[ci] ?? '').length;
+            if (len && Object.keys(char).length) wasm.applyCharFormatInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, 0, 0, len, JSON.stringify(char));
+            if (align) wasm.applyParaFormatInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, 0, JSON.stringify({ alignment: align }));
+          }
+        }
+      }
       // 캐럿은 표 다음 본문 문단의 처음 — 호스트가 이어서 글을 넣을 자리
       return { sectionIndex: pos.sectionIndex, paragraphIndex: r.paraIdx + 1, charOffset: 0 };
     },

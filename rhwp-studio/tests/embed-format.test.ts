@@ -111,6 +111,10 @@ test('[lily] table.insert 인자를 검증한다', async () => {
   assert.deepEqual(await routeEmbedRequest('table.insert', { rows: 1, cols: 2, cells: [['학년', '']] }, handlers), { ok: true, paragraph: 2, rows: 1, cols: 2 });
   await routeEmbedRequest('table.insert', { rows: 3, cols: 4 }, handlers);
   assert.deepEqual(calls, [{ rows: 1, cols: 2, cells: [['학년', '']] }, { rows: 3, cols: 4 }]);
+  // [lily] 칸 꾸밈은 그대로 넘어간다
+  const look = { widthsMm: [30, 60], heightsMm: [9], format: [{ rows: [0, 0] as [number, number], fill: '#EEF2FF', bold: true, align: 'center' as const, border: { color: '#4F46E5' } }] };
+  await routeEmbedRequest('table.insert', { rows: 2, cols: 2, cells: [['이름', '값']], ...look }, handlers);
+  assert.deepEqual(calls[2], { rows: 2, cols: 2, cells: [['이름', '값']], ...look });
   for (const bad of [
     { rows: 0, cols: 2 },
     { rows: 2, cols: 21 },
@@ -121,6 +125,14 @@ test('[lily] table.insert 인자를 검증한다', async () => {
     { rows: 1, cols: 2, cells: [[3]] },
     { rows: 1, cols: 2, cells: 'x' },
     { rows: 1, cols: 2, extra: 1 },
+    // [lily] 칸 꾸밈
+    { rows: 1, cols: 2, widthsMm: [10, 20, 30] },
+    { rows: 1, cols: 2, heightsMm: [0] },
+    { rows: 2, cols: 2, format: [{ rows: [0, 2] }] },
+    { rows: 2, cols: 2, format: [{ fill: 'red' }] },
+    { rows: 2, cols: 2, format: [{ border: { color: '#000000', width: 9 } }] },
+    { rows: 2, cols: 2, format: [{ vAlign: 'middle' }] },
+    { rows: 2, cols: 2, format: [{ shadow: true }] },
   ]) {
     await assert.rejects(() => routeEmbedRequest('table.insert', bad, handlers), JSON.stringify(bad));
   }
