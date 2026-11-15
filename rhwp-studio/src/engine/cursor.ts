@@ -4,6 +4,7 @@ import type { WasmBridge } from '@/core/wasm-bridge';
 import { cellAxisPath, type FocusedCellCursorGeometry } from './command';
 // 제외 셀 Set 의 키 형식은 조립하는 쪽과 조회하는 쪽이 반드시 같아야 한다 → 단일 정의.
 import { excludedCellKey } from './cell-block-format';
+import { isWordChar, findWordAt, findWordForDoubleClick } from './word-range';
 import type { CellSelectionPhase, CellSelectionPoint } from './cell-selection-phase';
 
 type CellSelectionReason = 'manual' | 'protected';
@@ -1603,6 +1604,45 @@ export class CursorState {
     this.clearSelection();
   }
 
+  /**
+   * [lily] 캐럿 자리의 낱말을 고른다(글 위 더블클릭). 본문 문단·표 셀만 —
+   * 머리말·각주·글상자는 손대지 않는다. 고를 낱말이 없으면 false.
+   */
+  selectWordAtCursor(): boolean {
+    if (this.isInHeaderFooter() || this.isInFootnote() || this.isInTextBox()) return false;
+    const pos = this.position;
+    const sec = pos.sectionIndex;
+    try {
+      let text: string;
+      if (this.isInCell()) {
+        const ppi = pos.parentParaIndex!;
+        const cellPath = pos.cellPath;
+        if ((cellPath?.length ?? 0) > 0) {
+          const pathJson = JSON.stringify(cellPath);
+          const len = this.wasm.getCellParagraphLengthByPath(sec, ppi, pathJson);
+          text = this.wasm.getTextInCellByPath(sec, ppi, pathJson, 0, len);
+        } else {
+          const len = this.wasm.getCellParagraphLength(sec, ppi, pos.controlIndex!, pos.cellIndex!, pos.cellParaIndex!);
+          text = this.wasm.getTextInCell(sec, ppi, pos.controlIndex!, pos.cellIndex!, pos.cellParaIndex!, 0, len);
+        }
+      } else {
+        const len = this.wasm.getParagraphLength(sec, pos.paragraphIndex);
+        text = this.wasm.getTextRange(sec, pos.paragraphIndex, 0, len);
+      }
+      const range = findWordForDoubleClick(text, pos.charOffset);
+      if (!range) return false;
+      this._expandPhase = 0;
+      this.anchor = { ...pos, charOffset: range.start };
+      this.position = { ...pos, charOffset: range.end };
+      this.preferredX = null;
+      this.updateRect();
+      return true;
+    } catch (e) {
+      console.warn('[CursorState] selectWordAtCursor 실패:', e);
+      return false;
+    }
+  }
+
   expandSelection(): void {
     this._expandPhase++;
     const pos = this.position;
@@ -2513,31 +2553,6 @@ function findWordBoundaryBackward(text: string): number {
 }
 
 // ─── 단어 범위 탐색 유틸 (PR #811, F3 단계 1 단어 선택) ──────────────────────────────────
-
-function isWordChar(c: string): boolean {
-  const code = c.charCodeAt(0);
-  if (code >= 0x30 && code <= 0x39) return true; // digit
-  if (code >= 0x41 && code <= 0x5A) return true; // A-Z
-  if (code >= 0x61 && code <= 0x7A) return true; // a-z
-  if (code >= 0xAC00 && code <= 0xD7AF) return true; // Hangul
-  if (code >= 0x3131 && code <= 0x318E) return true; // Hangul Jamo
-  return false;
-}
-
-function findWordAt(text: string, offset: number): { start: number; end: number } {
-  if (!text || offset >= text.length) return { start: offset, end: offset };
-  const atWord = isWordChar(text[offset] ?? '');
-  let start = offset;
-  let end = offset;
-  if (atWord) {
-    while (start > 0 && isWordChar(text[start - 1])) start--;
-    while (end < text.length && isWordChar(text[end])) end++;
-  } else {
-    while (start > 0 && !isWordChar(text[start - 1])) start--;
-    while (end < text.length && !isWordChar(text[end])) end++;
-  }
-  return { start, end };
-}
 
 // ─── 문장 범위 탐색 유틸 (#839, F3 단계 2 문장 선택) ──────────────────────────────────
 

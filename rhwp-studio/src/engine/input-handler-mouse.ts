@@ -1479,6 +1479,16 @@ export function onDblClick(this: any, e: MouseEvent): void {
       this.textarea.focus();
       return;
     }
+    return;
+  }
+
+  // [lily] 글 위 더블클릭 → 낱말 선택(본문·표 셀). 두 번째 누름이 캐럿을 그 자리에 둔 뒤다.
+  if (this.cursor.isInTableObjectSelection() || this.cursor.isInCellSelectionMode()) return;
+  if (!target.closest('#scroll-content')) return;
+  if (this.cursor.selectWordAtCursor()) {
+    e.preventDefault();
+    this.updateCaret(true);
+    this.textarea.focus();
   }
 }
 
