@@ -137,3 +137,22 @@ test('[lily] table.insert 인자를 검증한다', async () => {
     await assert.rejects(() => routeEmbedRequest('table.insert', bad, handlers), JSON.stringify(bad));
   }
 });
+
+test('[lily] page.setFill · shape.insert 인자를 검증한다', async () => {
+  const calls: unknown[] = [];
+  const handlers = {
+    pageSetFill: async (r: unknown) => { calls.push(r); return { ok: true }; },
+    shapeInsert: async (r: unknown) => { calls.push(r); return { ok: true }; },
+  } as unknown as EmbedRpcHandlers;
+  await routeEmbedRequest('page.setFill', { color: '#FCE7F3' }, handlers);
+  await routeEmbedRequest('page.setFill', { color: null }, handlers);
+  await routeEmbedRequest('shape.insert', { kind: 'star', xMm: 20, yMm: 30, widthMm: 9, heightMm: 9, fill: '#DB2777', transparency: 45 }, handlers);
+  assert.deepEqual(calls, [{ color: '#fce7f3' }, { color: null }, { kind: 'star', xMm: 20, yMm: 30, widthMm: 9, heightMm: 9, fill: '#db2777', transparency: 45 }]);
+  for (const bad of [{ color: 'pink' }, {}, { color: '#FFF' }, { color: '#ffffff', extra: 1 }]) {
+    await assert.rejects(() => routeEmbedRequest('page.setFill', bad, handlers), JSON.stringify(bad));
+  }
+  const shape = { kind: 'ellipse', xMm: 0, yMm: 0, widthMm: 10, heightMm: 10, fill: '#000000' };
+  for (const bad of [{ ...shape, kind: 'heart' }, { ...shape, widthMm: 0 }, { ...shape, xMm: -1 }, { ...shape, fill: 'red' }, { ...shape, transparency: 101 }, { ...shape, rotate: 3 }]) {
+    await assert.rejects(() => routeEmbedRequest('shape.insert', bad, handlers), JSON.stringify(bad));
+  }
+});

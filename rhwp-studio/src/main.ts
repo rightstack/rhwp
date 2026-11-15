@@ -67,6 +67,7 @@ import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
 import { charMods, embedFormatState, paraMods } from '@/embed/format-bridge';
 import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { insertTableAtCaret } from '@/embed/table-ops';
+import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertTextAt } from '@/embed/text-ops';
 import { MarkdownRules } from '@/embed/markdown-rules';
 import {
@@ -2294,6 +2295,16 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return insertTableAtCaret(inputHandler, req);
+    },
+    async pageSetFill(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return setPageFill(inputHandler, req);
+    },
+    async shapeInsert(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return insertDecorShape(inputHandler, req);
     },
     async textInsert(req) {
       await initPromise;

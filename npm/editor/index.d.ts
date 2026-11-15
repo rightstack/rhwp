@@ -395,6 +395,12 @@ export declare class RhwpEditor {
   };
 
   /** 표 만들기(실행 취소 한 단계) */
+  /** [lily] 쪽 바탕색(#rrggbb, null 이면 없앤다) */
+  readonly page: { setFill(color: string | null): Promise<{ ok: boolean }> };
+  /** [lily] 꾸밈 도형: 종이 기준 자리(mm)에, 글 뒤로, 테두리 없이 */
+  readonly shape: {
+    insert(shape: { kind: 'ellipse' | 'rectangle' | 'star'; xMm: number; yMm: number; widthMm: number; heightMm: number; fill: string; transparency?: number }): Promise<{ ok: boolean }>;
+  };
   readonly table: {
     /**
      * 캐럿(선택이 있으면 그 시작) 자리에 rows × cols 표. `cells[행][열]` = 칸의 글(줄바꿈 없는 한 문단, 없으면 빈 칸).

@@ -507,6 +507,21 @@ export class RhwpEditor {
    * 표 — `insert()` 는 캐럿(선택이 있으면 그 시작) 자리에 표를 만들고 `cells[행][열]` 의 글을 칸에 넣습니다.
    * 실행 취소 한 단계입니다. 캐럿이 본문 문단이 아니면(표 안·머리말 등) ok: false. 캐럿은 표 다음 문단의 처음으로 갑니다.
    */
+  /**
+   * [lily] 쪽 바탕색 — `setFill(color)`: 캐럿이 있는 구역의 종이 전체에 #rrggbb 를 깐다(null 이면 없앤다). 실행 취소 한 단계.
+   */
+  get page() {
+    return { setFill: (color) => this._request('page.setFill', { color }) };
+  }
+
+  /**
+   * [lily] 꾸밈 도형 — `insert({ kind, xMm, yMm, widthMm, heightMm, fill, transparency? })`: 종이 기준 자리에, 글 뒤로,
+   * 테두리 없이 놓는다(kind = ellipse · rectangle · star). 캐럿이 본문 문단이 아니면 ok: false. 실행 취소 한 단계.
+   */
+  get shape() {
+    return { insert: (shape) => this._request('shape.insert', shape) };
+  }
+
   get table() {
     return {
       // [lily] look = { widthsMm?, heightsMm?, format? } — 칸 너비 · 줄 높이 · 범위별 꾸밈(바탕 · 테두리 · 맞춤 · 글자)
