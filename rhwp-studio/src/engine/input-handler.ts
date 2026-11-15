@@ -5,6 +5,7 @@ import type { DeferredFocusedPagePatch } from '@/core/wasm-bridge';
 import { EventBus } from '@/core/event-bus';
 import { CursorState } from './cursor';
 import { CaretRenderer } from './caret-renderer';
+import { caretRectForPendingSize } from './pending-caret';
 import { resolveGlyphStartRect, isCompositionBoxRepresentable } from './line-start-affinity';
 import { FieldMarkerRenderer } from './field-marker-renderer';
 import { SelectionRenderer } from './selection-renderer';
@@ -2043,6 +2044,8 @@ export class InputHandler {
     const sel = this.getNonEmptySelection();
     if (!sel) {
       this.stagePendingCharShape(props);
+      // [lily] 대기 서식의 글자 크기를 캐럿 높이에 바로 반영한다(다음 캐럿 갱신까지 기다리지 않는다)
+      if (props.fontSize !== undefined) this.updateCaret(true);
       return;
     }
     const cmd = new ApplyCharFormatCommand(sel.start, sel.end, props);
@@ -3696,7 +3699,9 @@ export class InputHandler {
     const rect = this.cursor.getRect();
     if (rect) {
       const zoom = this.viewportManager.getZoom();
-      const caretRect = this.adjustExitedFieldEndCaretRect(rect);
+      // [lily] 선택 없이 준 글자 크기(대기 서식)는 아직 문서에 없다 — 캐럿 높이는 곧 칠 글자 크기를 따른다
+      const caretRect = caretRectForPendingSize(
+        this.adjustExitedFieldEndCaretRect(rect), this.getPendingCharShape()?.fontSize);
 
       // IME 조합 중: 블랙박스 캐럿 표시
       if (this.isComposing && this.compositionAnchor && this.compositionLength > 0) {
