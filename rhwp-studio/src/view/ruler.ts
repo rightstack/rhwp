@@ -24,11 +24,10 @@ import { isRulerLabelInsidePage } from './ruler-label-geometry.ts';
 
 export type { RulerPinCommit };
 
+import { parseRulerLook, type RulerLook } from './ruler-look.ts';
+
 /** 1mm = 96 / 25.4 px (at 96dpi, zoom=1) */
 const PX_PER_MM = 96 / 25.4;
-
-/** 눈금자 높이/너비 (CSS px) */
-const RULER_SIZE = 20;
 
 /** 문단 마커 크기 (CSS px) */
 const MARKER_SIZE = 6;
@@ -38,6 +37,8 @@ const PIN_HIT_RADIUS = MARKER_SIZE + 2;
 
 
 interface RulerPalette {
+  /** [lily] 용지 밖 바탕. 빈 값이면 여백색(예전 모양) — 띠 모양일 때는 비워 둔다(투명) */
+  outside: string;
   bgMargin: string;
   bgBody: string;
   tick: string;
@@ -47,6 +48,20 @@ interface RulerPalette {
 
 function cssVar(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+/** [lily] 띠 모양 바탕: 용지 구간만 여백색으로 칠한 둥근 띠. 그 안으로 clip 을 건 채 돌아간다(호출자가 restore). */
+function beginRulerStrip(
+  ctx: CanvasRenderingContext2D, palette: RulerPalette, radius: number,
+  x: number, y: number, w: number, h: number,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, w, h, radius);
+  else ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.fillStyle = palette.bgMargin;
+  ctx.fillRect(x, y, w, h);
 }
 
 export class Ruler {
@@ -193,12 +208,28 @@ export class Ruler {
 
   private palette(): RulerPalette {
     return {
+      outside: cssVar('--ruler-outside', ''),
       bgMargin: cssVar('--ruler-bg', '#d0d0d0'),
       bgBody: cssVar('--ruler-body', '#ffffff'),
       tick: cssVar('--ruler-tick', '#555555'),
       text: cssVar('--ruler-text', '#333333'),
       marker: cssVar('--ruler-marker', '#4080c0'),
     };
+  }
+
+  /** [lily] 지금 눈금자 모양(update 마다 CSS 변수에서 다시 읽는다 — 테마·스킨 전환) */
+  private look: RulerLook = parseRulerLook(() => '');
+
+  /** [lily] 바탕: 띠 모양이면 비우고(또는 `--ruler-outside`), 아니면 예전처럼 여백색으로 채운다 */
+  private paintBackdrop(ctx: CanvasRenderingContext2D, palette: RulerPalette, w: number, h: number): void {
+    if (this.look.radius > 0) {
+      ctx.clearRect(0, 0, w, h);
+      if (!palette.outside) return;
+      ctx.fillStyle = palette.outside;
+    } else {
+      ctx.fillStyle = palette.outside || palette.bgMargin;
+    }
+    ctx.fillRect(0, 0, w, h);
   }
 
   /** paint 직전에만 크기를 맞춘다. 같은 width/height 대입도 bitmap을 지우므로 생략한다. */
@@ -208,7 +239,7 @@ export class Ruler {
     const vH = this.container.clientHeight;
     const hWidth = Math.round(hW * dpr);
     const vHeight = Math.round(vH * dpr);
-    const thickness = Math.round(RULER_SIZE * dpr);
+    const thickness = Math.round(this.look.size * dpr);
     if (this.hCanvas.width !== hWidth) this.hCanvas.width = hWidth;
     if (this.hCanvas.height !== thickness) this.hCanvas.height = thickness;
     if (this.vCanvas.width !== thickness) this.vCanvas.width = thickness;
@@ -216,7 +247,7 @@ export class Ruler {
 
     const hCssWidth = `${hW}px`;
     const vCssHeight = `${vH}px`;
-    const cssThickness = `${RULER_SIZE}px`;
+    const cssThickness = `${this.look.size}px`;
     if (this.hCanvas.style.width !== hCssWidth) this.hCanvas.style.width = hCssWidth;
     if (this.hCanvas.style.height !== cssThickness) this.hCanvas.style.height = cssThickness;
     if (this.vCanvas.style.width !== cssThickness) this.vCanvas.style.width = cssThickness;
@@ -235,6 +266,7 @@ export class Ruler {
   /** 크기 변경과 두 축 paint 사이에 프레임을 넘기지 않는다 (#6187). */
   update(): void {
     const dpr = window.devicePixelRatio || 1;
+    this.look = parseRulerLook(name => cssVar(name, ''));
     this.syncCanvasSize(dpr);
     this.drawHorizontal(dpr);
     this.drawVertical(dpr);
@@ -559,15 +591,15 @@ export class Ruler {
     const ctx = this.hCtx;
     if (!ctx) return;
     const canvasW = this.hCanvas.width / dpr;
-    const canvasH = RULER_SIZE;
+    const canvasH = this.look.size;
+    const strip = this.look.radius > 0;
 
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const palette = this.palette();
 
     // 전체 배경 (여백색)
-    ctx.fillStyle = palette.bgMargin;
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    this.paintBackdrop(ctx, palette, canvasW, canvasH);
 
     // 문서를 닫아도 지난 문서의 핀이 배열에 남아 있으면 hover·드래그가 계속 걸리고,
     // 커밋이 getPageInfo 로 들어가 던진다.
@@ -603,6 +635,7 @@ export class Ruler {
     const pageLeftPinX = this.hDrag?.kind === 'pageMarginLeft' ? this.hDrag.x : bodyLeftPx;
     const pageRightPinX = this.hDrag?.kind === 'pageMarginRight' ? this.hDrag.x : bodyRightPx;
 
+    if (strip) beginRulerStrip(ctx, palette, this.look.radius, pageScreenLeft, 0, pageDisplayWidth, canvasH);
     if (editingContext && this.inCell) {
       // 셀 모드: 셀 영역만 본문 톤, 나머지는 여백 톤
       const cellLeftPx = pageScreenLeft + this.cellX * zoom;
@@ -632,14 +665,19 @@ export class Ruler {
 
     // 용지 전체 범위. 본문 띠만으로는 저배율에서 눈금자가 용지보다 짧아 보이므로
     // 시작·끝을 명시한다. 문서 좌표는 바꾸지 않는 화면 표시선이다.
-    ctx.strokeStyle = palette.tick;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pageScreenLeft, 0);
-    ctx.lineTo(pageScreenLeft, canvasH);
-    ctx.moveTo(pageScreenLeft + pageDisplayWidth, 0);
-    ctx.lineTo(pageScreenLeft + pageDisplayWidth, canvasH);
-    ctx.stroke();
+    // [lily] 띠 모양이면 띠의 둥근 끝이 곧 용지의 시작·끝이다.
+    if (strip) {
+      ctx.restore();
+    } else {
+      ctx.strokeStyle = palette.tick;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pageScreenLeft, 0);
+      ctx.lineTo(pageScreenLeft, canvasH);
+      ctx.moveTo(pageScreenLeft + pageDisplayWidth, 0);
+      ctx.lineTo(pageScreenLeft + pageDisplayWidth, canvasH);
+      ctx.stroke();
+    }
 
     // 화면 밀도에 맞춘 mm 눈금 그리기
     const mmPx = PX_PER_MM * zoom;
@@ -652,7 +690,7 @@ export class Ruler {
     ctx.strokeStyle = palette.tick;
     ctx.fillStyle = palette.text;
     ctx.lineWidth = 0.5;
-    ctx.font = '9px sans-serif';
+    ctx.font = this.look.font;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
 
@@ -755,16 +793,16 @@ export class Ruler {
   private drawVertical(dpr: number): void {
     const ctx = this.vCtx;
     if (!ctx) return;
-    const canvasW = RULER_SIZE;
+    const canvasW = this.look.size;
     const canvasH = this.vCanvas.height / dpr;
+    const strip = this.look.radius > 0;
 
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const palette = this.palette();
 
     // 전체 배경 (여백색)
-    ctx.fillStyle = palette.bgMargin;
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    this.paintBackdrop(ctx, palette, canvasW, canvasH);
 
     const activePageIdx = this.rulerPageIndex();
     if (activePageIdx === null) {
@@ -805,18 +843,23 @@ export class Ruler {
     // (가로는 머리말이 없어 "여백 안쪽"이 곧 본문이다). 머리말/꼬리말을 세 번째 톤으로
     // 나누는 안은 버렸다: 어두운 테마의 여백↔본문 색차가 rgb 9 뿐이라 그 사이에 낀 톤은
     // 보이지 않고, 핀이 무엇을 가리키는지만 흐려진다.
+    const pageDisplayHeight = pageInfo.height * zoom;
+    if (strip) beginRulerStrip(ctx, palette, this.look.radius, 0, pageScreenTop, canvasW, pageDisplayHeight);
     ctx.fillStyle = palette.bgBody;
     ctx.fillRect(0, marginTopPx, canvasW, marginBottomPx - marginTopPx);
 
-    const pageDisplayHeight = pageInfo.height * zoom;
-    ctx.strokeStyle = palette.tick;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, pageScreenTop);
-    ctx.lineTo(canvasW, pageScreenTop);
-    ctx.moveTo(0, pageScreenTop + pageDisplayHeight);
-    ctx.lineTo(canvasW, pageScreenTop + pageDisplayHeight);
-    ctx.stroke();
+    if (strip) {
+      ctx.restore();
+    } else {
+      ctx.strokeStyle = palette.tick;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, pageScreenTop);
+      ctx.lineTo(canvasW, pageScreenTop);
+      ctx.moveTo(0, pageScreenTop + pageDisplayHeight);
+      ctx.lineTo(canvasW, pageScreenTop + pageDisplayHeight);
+      ctx.stroke();
+    }
 
     // 드래그 중이면 잡은 핀만 마우스 위치로 대체 (라이브 프리뷰)
     const topY = this.vDrag?.kind === 'top' && this.vDrag.pageIdx === pageIdx
@@ -836,7 +879,7 @@ export class Ruler {
     ctx.strokeStyle = palette.tick;
     ctx.fillStyle = palette.text;
     ctx.lineWidth = 0.5;
-    ctx.font = '9px sans-serif';
+    ctx.font = this.look.font;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
