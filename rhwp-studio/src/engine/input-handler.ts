@@ -3744,7 +3744,11 @@ export class InputHandler {
             let fontFamily = 'sans-serif';
             try {
               const props = this.getCharPropertiesAtCursor();
-              if (props.fontFamily) fontFamily = props.fontFamily;
+              if (props.fontFamily) {
+                // [lily] 호스트 글꼴은 문서 이름이 아니라 내부 별칭으로만 등록된다 — 조합 상자도 캔버스와 같은 face 로
+                fontFamily = this.wasm.hostOverlayFontFamily?.(props.fontFamily, { bold: !!props.bold, italic: !!props.italic })
+                  ?? props.fontFamily;
+              }
             } catch { /* fallback */ }
             this.caret.showComposition(startRect, charWidth, zoom, text, fontFamily);
           }

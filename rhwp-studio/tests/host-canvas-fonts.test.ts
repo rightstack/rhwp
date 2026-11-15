@@ -81,3 +81,15 @@ test('failed loads are bounded within a generation and retry after replacement',
     assert(!f.fonts.has(previous), 'notification immediately releases old faces');
   } finally { await f.dispose(); }
 });
+
+// [lily] IME 조합 상자(DOM 오버레이)는 캔버스 scope 밖에서 그린다 — 같은 호스트 face 별칭을 맨 앞에 둔 목록을 받는다
+test('DOM overlays get the host face alias first, and nothing for fonts the host does not supply', async () => {
+  const f = await fixture();
+  try {
+    assert.equal(f.session.overlayFontFamily('Host Test', { italic: true }), null, 'not prepared yet');
+    await f.session.prepare(f.records());
+    const family = f.session.overlayFontFamily('Host Test', { italic: true });
+    assert.match(family!, /^"?__rhwp_host_face_\d+_\d+"?,\s*"?Host Test"?$/);
+    assert.equal(f.session.overlayFontFamily('Not Supplied'), null);
+  } finally { await f.dispose(); }
+});

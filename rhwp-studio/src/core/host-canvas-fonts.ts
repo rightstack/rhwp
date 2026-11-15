@@ -104,6 +104,15 @@ export class HostCanvasFontSession {
     return loaded ? `${match[1]}${match[2]} ${formatCssFontFamilyList([loaded.alias, ...families])}` : null;
   }
 
+  /** [lily] DOM overlays (the IME composition box) draw outside the canvas scope: give them the
+   * same host face the canvas paints with, as a CSS font-family list (alias first). */
+  overlayFontFamily(family: string, options: { bold?: boolean; italic?: boolean } = {}): string | null {
+    const descriptor = `${options.italic ? 'italic ' : ''}${options.bold ? 'bold ' : ''}16px ${formatCssFontFamilyList([family])}`;
+    const resolved = this.resolve(descriptor);
+    const match = resolved ? /px\s+(.+)$/.exec(resolved) : null;
+    return match ? match[1] : null;
+  }
+
   /** The asynchronous metric session receives a scoped synchronous context. */
   measurementContext(context: CanvasFontContext): CanvasFontContext {
     const session = this;

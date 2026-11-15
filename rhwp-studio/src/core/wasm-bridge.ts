@@ -303,6 +303,11 @@ export class WasmBridge {
   private doc: HwpDocument | null = null;
   private canvasMetrics = new CanvasMetricSession();
   private readonly hostCanvasFonts = new HostCanvasFontSession();
+
+  /** [lily] IME 조합 상자 같은 DOM 오버레이용 글꼴 목록 — 호스트 글꼴이면 캔버스와 같은 face 별칭이 맨 앞. 아니면 null */
+  hostOverlayFontFamily(family: string, options: { bold?: boolean; italic?: boolean } = {}): string | null {
+    return this.hostCanvasFonts.overlayFontFamily(family, options);
+  }
   private canvasFontGeneration = 0;
 
   private canvasMetricDocument(): CanvasMetricDocument | null {
