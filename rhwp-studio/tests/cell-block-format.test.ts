@@ -168,7 +168,9 @@ test('셀 블록 글자 서식은 되돌리기 라우팅(executeOperation)을 �
   assert.match(body, /this\.executeOperation\(\{\s*\n?\s*kind: 'snapshot'/,
     '스냅샷 라우팅을 거치지 않는다');
   assert.match(body, /wasm\.applyCharFormatInCell\(/, '셀 글자 서식 적용 호출이 없다');
-  assert.match(body, /if \(len <= 0\) continue;/, '빈 문단 건너뛰기가 없다');
+  // [lily] 빈 문단(빈 셀)도 대상 — 0 길이 범위를 코어가 "이어 입력할 글자의 모양"으로 받는다
+  assert.doesNotMatch(body, /if \(len <= 0\) continue;/, '빈 문단을 건너뛰면 빈 셀에 준 글자 모양이 먹지 않는다');
+  assert.match(body, /const len = Math\.max\(0, wasm\.getCellParagraphLength\(/, '빈 문단도 0 길이 범위로 적용해야 한다');
 });
 
 test('글자 서식 적용 진입점이 셀 블록 분기를 먼저 호출한다', () => {

@@ -2166,8 +2166,9 @@ export class InputHandler {
    * 근본 해결: ParaFormatEntry 에 셀 좌표를 실어 ApplyCharFormatCommand 가 셀 목록을
    * 받게 하면 셀별 charShapeId 되돌리기가 되고 스냅샷이 필요 없어진다.
    *
-   * 빈 문단(len 0)은 건너뛴다 — 본문 텍스트 선택에서도 ApplyCharFormatCommand 가 같은
-   * 조건(to <= from)으로 건너뛴다.
+   * [lily] 빈 문단(len 0)에도 적용한다 — 코어는 글자가 없는 문단의 0 길이 범위를 "문단 끝 모양
+   * = 이어 입력할 글자의 모양"으로 받는다(paragraph.rs `char_shape_range_bounds`). 한컴처럼 빈 셀에
+   * 준 글자 모양이 그 셀에 칠 글자의 모양이 된다. 글이 있는 문단은 종전대로 [0, len).
    */
   private applyCharFormatToCellBlock(block: SelectedCellBlock, props: Partial<CharProperties>): void {
     const propsJson = JSON.stringify(props);
@@ -2184,16 +2185,14 @@ export class InputHandler {
               const paraCount = wasm.getCellParagraphCountByPath(block.sec, block.ppi, JSON.stringify(withCellPathTarget(path, cellIdx)));
               for (let cellParaIdx = 0; cellParaIdx < paraCount; cellParaIdx++) {
                 const pathJson = JSON.stringify(withCellPathTarget(path, cellIdx, cellParaIdx));
-                const len = wasm.getCellParagraphLengthByPath(block.sec, block.ppi, pathJson);
-                if (len <= 0) continue;
+                const len = Math.max(0, wasm.getCellParagraphLengthByPath(block.sec, block.ppi, pathJson));
                 wasm.applyCharFormatInCellByPath(block.sec, block.ppi, pathJson, 0, len, propsJson);
               }
               continue;
             }
             const paraCount = wasm.getCellParagraphCount(block.sec, block.ppi, block.ci, cellIdx);
             for (let cellParaIdx = 0; cellParaIdx < paraCount; cellParaIdx++) {
-              const len = wasm.getCellParagraphLength(block.sec, block.ppi, block.ci, cellIdx, cellParaIdx);
-              if (len <= 0) continue;
+              const len = Math.max(0, wasm.getCellParagraphLength(block.sec, block.ppi, block.ci, cellIdx, cellParaIdx));
               wasm.applyCharFormatInCell(block.sec, block.ppi, block.ci, cellIdx, cellParaIdx, 0, len, propsJson);
             }
           }
