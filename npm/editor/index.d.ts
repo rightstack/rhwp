@@ -394,6 +394,16 @@ export declare class RhwpEditor {
     edit(memoIndex: number, text: string): Promise<{ ok: boolean }>;
   };
 
+  /** [lily] 누름틀 — 넣기 · 목록 · 값 넣기(넣기 · 값 넣기는 실행 취소 한 단계) */
+  readonly field: {
+    /** 캐럿(선택이 있으면 그 시작)에 빈 누름틀(본문 · 표 칸 · 글상자). guide = 안내문, editable 기본 true. 머리말 · 각주 안이면 ok: false */
+    insert(field: { name?: string; guide?: string; memo?: string; editable?: boolean }): Promise<{ ok: boolean; fieldId?: number }>;
+    /** 문서의 누름틀(문서 차례). section·paragraph = 본문 문단(표 · 글상자 안이면 그것을 가진 문단), start·end = 본문 문단 안 글자 자리 */
+    list(): Promise<Array<{ fieldId: number; name: string; guide: string; value: string; section: number; paragraph: number; nested: boolean; start: number; end: number }>>;
+    /** 누름틀 하나에 값 — fieldId 또는 name(+ occurrence, 0부터). 못 찾으면 ok: false */
+    set(target: { fieldId: number } | { name: string; occurrence?: number }, value: string): Promise<{ ok: boolean; fieldId?: number }>;
+  };
+
   /** 표 만들기(실행 취소 한 단계) */
   /** [lily] 쪽 바탕색(#rrggbb, null 이면 없앤다) */
   readonly page: { setFill(color: string | null): Promise<{ ok: boolean }> };

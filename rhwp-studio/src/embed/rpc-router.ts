@@ -23,6 +23,7 @@ import {
   type EmbedParaFormatV1,
 } from './format-bridge.ts';
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
+import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
 import { parseTableInsert, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
 import { parsePageFill, parseShapeInsert, type EmbedPageFillV1, type EmbedPageOpResultV1, type EmbedShapeInsertV1 } from './page-ops.ts';
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
@@ -114,6 +115,14 @@ export interface EmbedRpcHandlers {
   memoInsert(req: EmbedMemoInsertV1): Promise<{ ok: boolean; memoIndex?: number }>;
   /** 메모 번호로 글 바꾸기 */
   memoEdit(req: EmbedMemoEditV1): Promise<{ ok: boolean }>;
+
+  // ── [lily] 누름틀 넣기 · 목록 · 값 넣기(호스트 채울 자리 · 명령 검색 · 템플릿) ──
+  /** 캐럿(선택이 있으면 그 시작)에 빈 누름틀 — 본문 · 표 칸 · 글상자. 실행 취소 한 단계 */
+  fieldInsert(req: EmbedFieldInsertV1): Promise<{ ok: boolean; fieldId?: number }>;
+  /** 문서의 누름틀(문서 차례) */
+  fieldList(): Promise<EmbedFieldV1[]>;
+  /** 누름틀 하나에 값(fieldId 또는 이름 + occurrence). 실행 취소 한 단계 */
+  fieldSet(req: EmbedFieldSetV1): Promise<{ ok: boolean; fieldId?: number }>;
 
   // ── [lily] 캐럿 자리에 표 만들기 + 칸의 글(실행 취소 한 단계) ──
   tableInsert(req: EmbedTableInsertV1): Promise<EmbedTableInsertResultV1>;
@@ -370,6 +379,15 @@ export async function routeEmbedRequest(
     case 'memo.edit':
       assertOnlyKeys(params, ['memoIndex', 'text'], 'memo.edit params');
       return handlers.memoEdit(parseMemoEdit(params));
+    case 'field.insert':
+      assertOnlyKeys(params, ['name', 'guide', 'memo', 'editable'], 'field.insert params');
+      return handlers.fieldInsert(parseFieldInsert(params));
+    case 'field.list':
+      assertEmptyParams(params, 'field.list params');
+      return handlers.fieldList();
+    case 'field.set':
+      assertOnlyKeys(params, ['fieldId', 'name', 'occurrence', 'value'], 'field.set params');
+      return handlers.fieldSet(parseFieldSet(params));
     case 'table.insert':
       assertOnlyKeys(params, ['rows', 'cols', 'cells', 'widthsMm', 'heightsMm', 'format'], 'table.insert params');
       return handlers.tableInsert(parseTableInsert(params));

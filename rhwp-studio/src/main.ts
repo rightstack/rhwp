@@ -68,6 +68,7 @@ import { charMods, embedFormatState, paraMods } from '@/embed/format-bridge';
 import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { insertTableAtCaret } from '@/embed/table-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
+import { insertFieldAtCaret, listClickHereFields, setFieldValue } from '@/embed/field-ops';
 import { insertTextAt } from '@/embed/text-ops';
 import { MarkdownRules } from '@/embed/markdown-rules';
 import {
@@ -2290,6 +2291,21 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return editMemo(inputHandler, req);
+    },
+    async fieldInsert(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return insertFieldAtCaret(inputHandler, wasm, req);
+    },
+    async fieldList() {
+      await initPromise;
+      if (wasm.pageCount === 0) return [];
+      return listClickHereFields(wasm);
+    },
+    async fieldSet(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return setFieldValue(inputHandler, req);
     },
     async tableInsert(req) {
       await initPromise;

@@ -504,6 +504,19 @@ export class RhwpEditor {
   }
 
   /**
+   * [lily] 누름틀 — `insert({ name?, guide?, memo?, editable? })` 는 캐럿(선택이 있으면 그 시작)에 빈 누름틀을 넣고(안내문이 보인다),
+   * `list()` 는 문서의 누름틀을, `set(target, value)` 는 fieldId 또는 이름(+ occurrence)으로 값을 넣습니다.
+   * 넣기 · 값 넣기는 실행 취소 한 단계입니다.
+   */
+  get field() {
+    return {
+      insert: (field = {}) => this._request('field.insert', field),
+      list: () => this._request('field.list', {}),
+      set: (target, value) => this._request('field.set', { ...target, value }),
+    };
+  }
+
+  /**
    * 표 — `insert()` 는 캐럿(선택이 있으면 그 시작) 자리에 표를 만들고 `cells[행][열]` 의 글을 칸에 넣습니다.
    * 실행 취소 한 단계입니다. 캐럿이 본문 문단이 아니면(표 안·머리말 등) ok: false. 캐럿은 표 다음 문단의 처음으로 갑니다.
    */
