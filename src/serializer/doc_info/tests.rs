@@ -881,3 +881,48 @@ fn issue4898_face_name_fills_measured_default_font_name() {
         .expect("FACE_NAME 재파싱");
     assert_eq!(parsed.default_name, None);
 }
+
+/// [lily] 단색 채우기의 무늬 종류 0(스펙 밖 값 — 한컴은 가로줄로 그린다)은 무늬 없음 -1 로 쓴다.
+/// 1~6(스펙 표 29 무늬)과 -1 은 그대로다.
+#[test]
+fn lily_serialize_border_fill_writes_pattern_zero_as_none() {
+    const FILL_OFFSET: usize = 32;
+    for (given, written) in [(0, -1), (-1, -1), (1, 1), (6, 6)] {
+        let bf = BorderFill {
+            raw_data: None,
+            attr: 0,
+            borders: [BorderLine::default(); 4],
+            diagonal: DiagonalLine::default(),
+            center_line: CenterLine::None,
+            fill: Fill {
+                fill_type: FillType::Solid,
+                solid: Some(SolidFill {
+                    background_color: 0x00C3F9FE,
+                    pattern_color: 0,
+                    pattern_type: given,
+                }),
+                gradient: None,
+                image: None,
+                alpha: 0,
+            },
+            three_d: false,
+        };
+        let data = serialize_border_fill(&bf);
+        let mut r = crate::parser::byte_reader::ByteReader::new(&data[FILL_OFFSET..]);
+        let parsed = crate::parser::doc_info::parse_fill(&mut r);
+        assert_eq!(
+            parsed.solid.unwrap().pattern_type,
+            written,
+            "pattern_type {given}"
+        );
+    }
+}
+
+/// [lily] 무늬를 주지 않은 채우기 JSON(쪽 바탕 · 칸 색 RPC)은 무늬 없음 -1 로 만든다.
+#[test]
+fn lily_border_fill_json_without_pattern_is_none() {
+    let mut core = crate::document_core::DocumentCore::new_empty();
+    let id = core.create_border_fill_from_json(r##"{"fillType":"solid","fillColor":"#fef9c3"}"##);
+    let bf = &core.document.doc_info.border_fills[id as usize - 1];
+    assert_eq!(bf.fill.solid.as_ref().unwrap().pattern_type, -1);
+}

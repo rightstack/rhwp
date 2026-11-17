@@ -2753,7 +2753,8 @@ fn serialize_shape_fill(w: &mut ByteWriter, fill: &Fill) {
         if let Some(ref solid) = fill.solid {
             w.write_color_ref(solid.background_color).unwrap();
             w.write_color_ref(solid.pattern_color).unwrap();
-            w.write_i32(solid.pattern_type).unwrap();
+            w.write_i32(super::doc_info::hwp5_pattern_type(solid.pattern_type))
+                .unwrap();
         }
     }
 

@@ -597,7 +597,7 @@ fn serialize_fill(w: &mut ByteWriter, fill: &crate::model::style::Fill) {
             if let Some(ref solid) = fill.solid {
                 w.write_color_ref(solid.background_color).unwrap();
                 w.write_color_ref(solid.pattern_color).unwrap();
-                w.write_i32(solid.pattern_type).unwrap();
+                w.write_i32(hwp5_pattern_type(solid.pattern_type)).unwrap();
             }
             // 추가 채우기 속성: size(u32) = 0, 이어서 미확인 바이트로 alpha(u8).
             // hwplib 및 parse_fill(additional_size 만큼 skip 후 종류별 1바이트를
@@ -1173,3 +1173,18 @@ pub fn surgical_update_caret(
 
 #[cfg(test)]
 mod tests;
+
+/// [lily] HWP5 단색 채우기의 무늬 종류를 쓸 값으로 고른다.
+///
+/// 스펙(표 29)의 무늬는 1~6 이고 무늬 없음은 한컴이 쓰는 -1 이다. 0 은 정의되지 않은 값인데
+/// 편집 경로(`create_border_fill_from_json` 의 기본값, 쪽 테두리/배경 대화 상자의 "무늬 없음")가
+/// 0 을 만들고, 한컴 오피스는 0 을 가로줄 무늬로 그린다 — 쪽 바탕·칸 색에 검은 가로줄이 촘촘히 보인다.
+/// HWPX 쓰기(`serializer/hwpx/shape.rs` `pattern_type >= 1` 일 때만 hatchStyle)와 같은 규칙으로 1 보다
+/// 작으면 무늬 없음(-1)으로 쓴다.
+pub(crate) fn hwp5_pattern_type(pattern_type: i32) -> i32 {
+    if pattern_type < 1 {
+        -1
+    } else {
+        pattern_type
+    }
+}

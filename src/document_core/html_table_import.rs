@@ -858,7 +858,8 @@ impl DocumentCore {
             bf.fill = if fill_type_str == "solid" {
                 let bg = json_color(json, "fillColor").unwrap_or(0xFFFFFF);
                 let pat_c = json_color(json, "patternColor").unwrap_or(0);
-                let pat_t = json_i32(json, "patternType").unwrap_or(0);
+                // [lily] 무늬를 주지 않으면 무늬 없음(-1, 한컴과 IR 의 값). 0 은 한컴에서 가로줄이다
+                let pat_t = json_i32(json, "patternType").unwrap_or(-1);
                 Fill {
                     fill_type: FillType::Solid,
                     solid: Some(SolidFill {
