@@ -3746,15 +3746,18 @@ export class InputHandler {
             const text = this.textarea.value || '';
             // 현재 커서 위치의 글꼴 정보
             let fontFamily = 'sans-serif';
+            // [lily] 조합 중 글자 크기(HWPUNIT) — 조합 상자 글자를 캔버스와 같은 크기로
+            let fontSize: number | undefined;
             try {
               const props = this.getCharPropertiesAtCursor();
+              fontSize = props.fontSize;
               if (props.fontFamily) {
                 // [lily] 호스트 글꼴은 문서 이름이 아니라 내부 별칭으로만 등록된다 — 조합 상자도 캔버스와 같은 face 로
                 fontFamily = this.wasm.hostOverlayFontFamily?.(props.fontFamily, { bold: !!props.bold, italic: !!props.italic })
                   ?? props.fontFamily;
               }
             } catch { /* fallback */ }
-            this.caret.showComposition(startRect, charWidth, zoom, text, fontFamily);
+            this.caret.showComposition(startRect, charWidth, zoom, text, fontFamily, fontSize);
           }
         } catch {
           // getCursorRect 실패 시 일반 캐럿

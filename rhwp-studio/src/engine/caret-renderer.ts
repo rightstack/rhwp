@@ -1,5 +1,6 @@
 import type { CursorRect } from '@/core/types';
 import { VirtualScroll } from '@/view/virtual-scroll';
+import { compositionFontPx } from './pending-caret';
 
 /** Canvas 위에 깜박이는 캐럿을 렌더링한다 */
 export class CaretRenderer {
@@ -100,7 +101,7 @@ export class CaretRenderer {
   }
 
   /** IME 조합 오버레이를 표시한다 */
-  showComposition(startRect: CursorRect, charWidth: number, zoom: number, text: string, fontFamily: string): void {
+  showComposition(startRect: CursorRect, charWidth: number, zoom: number, text: string, fontFamily: string, fontSizeHwpunit?: number): void {
     this.ensureAttached();
     this.isCompMode = true;
 
@@ -122,7 +123,8 @@ export class CaretRenderer {
     this.compEl.style.top = `${top}px`;
     this.compEl.style.width = `${w}px`;
     this.compEl.style.height = `${h}px`;
-    this.compEl.style.fontSize = `${box.h * 0.85 * zoom}px`;
+    // [lily] 캔버스와 같은 글자 크기(upstream 은 상자 높이 × 0.85 — 조합 중 글자가 작게 보였다)
+    this.compEl.style.fontSize = `${compositionFontPx(box.h, fontSizeHwpunit, zoom)}px`;
     this.compEl.style.fontFamily = fontFamily || 'sans-serif';
     this.compEl.style.lineHeight = `${h}px`;
     this.compEl.textContent = text;

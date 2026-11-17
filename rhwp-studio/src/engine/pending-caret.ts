@@ -13,3 +13,15 @@ export function caretRectForPendingSize<T extends { height: number }>(rect: T, f
   if (Math.abs(height - rect.height) < 0.5) return rect;
   return { ...rect, height };
 }
+
+/**
+ * [lily] IME 조합 상자 글자의 CSS 글자 크기(px, 배율 적용). 캔버스는 글자를 글자 크기(pt × 96/72)로 그린다 —
+ * upstream 은 상자 높이(= 캐럿 높이 = 글자 크기)의 0.85 배로 그려 조합 중 글자가 작게 보였다가 조합이 끝나면
+ * 제 크기로 돌아왔다. 글자 크기를 알면 그 크기로, 셀 경계로 상자가 잘렸으면 상자 높이까지만. 모르면 상자 높이.
+ */
+export function compositionFontPx(boxHeight: number, fontSizeHwpunit: number | undefined, zoom: number): number {
+  const glyph = fontSizeHwpunit !== undefined && Number.isFinite(fontSizeHwpunit) && fontSizeHwpunit > 0
+    ? fontSizeHwpunit * PX_PER_HWPUNIT_PT
+    : boxHeight;
+  return Math.min(glyph, boxHeight) * zoom;
+}
