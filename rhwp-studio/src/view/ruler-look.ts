@@ -25,3 +25,13 @@ export function parseRulerLook(read: (name: string) => string): RulerLook {
     radius: px('--ruler-radius', 0, 0, 20),
   };
 }
+
+/**
+ * [lily] 둥근 띠의 양 끝(반경 안)에는 눈금을 긋지 않는다 — 0 눈금 · 용지 끝 눈금이 둥근 모서리 밖으로 삐져나와 보였다
+ * (QA take4 T4-06). 띠의 둥근 끝이 곧 용지의 시작 · 끝이다. 반경이 0(예전 모양)이면 모두 긋는다.
+ * `pos` · `start` · `length` 는 같은 화면 좌표(px).
+ */
+export function isTickInsideStripEnds(pos: number, start: number, length: number, radius: number): boolean {
+  if (radius <= 0) return true;
+  return pos >= start + radius && pos <= start + length - radius;
+}

@@ -24,7 +24,7 @@ import { isRulerLabelInsidePage } from './ruler-label-geometry.ts';
 
 export type { RulerPinCommit };
 
-import { parseRulerLook, type RulerLook } from './ruler-look.ts';
+import { isTickInsideStripEnds, parseRulerLook, type RulerLook } from './ruler-look.ts';
 
 /** 1mm = 96 / 25.4 px (at 96dpi, zoom=1) */
 const PX_PER_MM = 96 / 25.4;
@@ -700,6 +700,8 @@ export class Ruler {
 
       // 화면 밖 스킵
       if (x < -10 || x > canvasW + 10) continue;
+      // [lily] 둥근 띠의 양 끝(반경 안)에는 긋지 않는다
+      if (strip && !isTickInsideStripEnds(x, pageScreenLeft, pageDisplayWidth, this.look.radius)) continue;
 
       let tickH: number;
       if (tickIndex % labelEvery === 0) {
@@ -889,6 +891,8 @@ export class Ruler {
 
       // 화면 밖 스킵
       if (y < -10 || y > canvasH + 10) continue;
+      // [lily] 둥근 띠의 양 끝(반경 안)에는 긋지 않는다
+      if (strip && !isTickInsideStripEnds(y, pageScreenTop, pageDisplayHeight, this.look.radius)) continue;
 
       let tickW: number;
       if (tickIndex % labelEvery === 0) {
