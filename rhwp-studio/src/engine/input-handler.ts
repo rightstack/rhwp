@@ -5402,6 +5402,10 @@ export class InputHandler {
     if (this.cursor.hasSelection()) {
       if (wasVisible) this.fieldMarker.hide();
       this.wasm.clearActiveField();
+      // [lily] 활성 누름틀을 풀었으면 쪽을 다시 그린다(안내문이 다시 보이게). 마우스로 다른 곳을 누르는 중에 이 갈래가
+      // 마커를 먼저 숨기고 활성 필드를 풀면, 뒤이은 "필드 밖" 갈래는 마커가 이미 숨어 있어(wasVisible=false)
+      // 다시 그리기를 건너뛰었다 — 엔진은 안내문을 그리는데 화면 캔버스는 빈 자리로 남았다(QA take4 T4-05).
+      if (wasVisible) this.eventBus.emit('document-changed');
       this.eventBus.emit('field-info-changed', null);
       return;
     }
@@ -5412,6 +5416,8 @@ export class InputHandler {
         if (this.isAtExitedFieldStart(pos, fi) || this.isAtExitedFieldEnd(pos, fi)) {
           if (wasVisible) this.fieldMarker.hide();
           this.wasm.clearActiveField();
+          // [lily] 위 선택 갈래와 같다 — 활성 누름틀을 풀었으면 다시 그린다(T4-05)
+          if (wasVisible) this.eventBus.emit('document-changed');
           this.eventBus.emit('field-info-changed', null);
           return;
         }
