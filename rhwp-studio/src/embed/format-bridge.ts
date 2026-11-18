@@ -25,6 +25,8 @@ export interface EmbedCharFormatV1 {
   subscript?: boolean;
   /** '#rrggbb' */
   textColor?: string;
+  /** [lily] 음영(형광펜) '#rrggbb' — 없앰 = '#ffffff'(studio 서식 줄 형광펜 "없음"과 같은 값) */
+  shadeColor?: string;
 }
 
 /** 문단 모양(쓰기). 여백·들여쓰기·문단 간격은 pt, 줄 간격은 Percent 면 %, 그 외는 pt */
@@ -43,7 +45,7 @@ export interface EmbedParaFormatV1 {
 /** 캐럿 위치의 서식 값(읽기) */
 export interface EmbedFormatStateV1 {
   char: Required<Pick<EmbedCharFormatV1, 'bold' | 'italic' | 'underline' | 'strikethrough' | 'superscript' | 'subscript'>>
-    & { fontName: string | null; fontSizePt: number | null; textColor: string | null };
+    & { fontName: string | null; fontSizePt: number | null; textColor: string | null; shadeColor: string | null };
   para: {
     alignment: EmbedAlignmentV1 | null;
     lineSpacingType: EmbedLineSpacingTypeV1 | null;
@@ -74,6 +76,7 @@ export function embedFormatState(char: CharProperties | null, para: ParaProperti
       fontName: c.fontFamily ?? null,
       fontSizePt: typeof c.fontSize === 'number' ? round1(c.fontSize / HWPUNIT_PER_PT) : null,
       textColor: c.textColor ?? null,
+      shadeColor: c.shadeColor ?? null,
       bold: c.bold === true,
       italic: c.italic === true,
       underline: c.underline === true,
@@ -117,7 +120,7 @@ function bool(value: unknown, label: string): boolean {
   return value;
 }
 
-const CHAR_KEYS = ['fontSizePt', 'bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'textColor'] as const;
+const CHAR_KEYS = ['fontSizePt', 'bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript', 'textColor', 'shadeColor'] as const;
 const PARA_KEYS = ['alignment', 'lineSpacingType', 'lineSpacing', 'marginLeftPt', 'marginRightPt', 'indentPt', 'spacingBeforePt', 'spacingAfterPt'] as const;
 
 export function parseCharFormat(value: unknown): EmbedCharFormatV1 {
@@ -128,9 +131,11 @@ export function parseCharFormat(value: unknown): EmbedCharFormatV1 {
   for (const k of ['bold', 'italic', 'underline', 'strikethrough', 'superscript', 'subscript'] as const) {
     if (v[k] !== undefined) out[k] = bool(v[k], k);
   }
-  if (v.textColor !== undefined) {
-    if (typeof v.textColor !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(v.textColor)) throw new Error('textColor must be #rrggbb');
-    out.textColor = v.textColor.toLowerCase();
+  for (const k of ['textColor', 'shadeColor'] as const) {
+    if (v[k] === undefined) continue;
+    const c = v[k];
+    if (typeof c !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(c)) throw new Error(`${k} must be #rrggbb`);
+    out[k] = c.toLowerCase();
   }
   return out;
 }
@@ -164,6 +169,7 @@ export function charMods(v: EmbedCharFormatV1): Partial<CharProperties> {
   if (v.superscript !== undefined) { m.superscript = v.superscript; if (v.superscript) m.subscript = false; }
   if (v.subscript !== undefined) { m.subscript = v.subscript; if (v.subscript) m.superscript = false; }
   if (v.textColor !== undefined) m.textColor = v.textColor;
+  if (v.shadeColor !== undefined) m.shadeColor = v.shadeColor;
   return m;
 }
 
@@ -186,4 +192,21 @@ export function paraMods(v: EmbedParaFormatV1, currentType: EmbedLineSpacingType
   if (v.spacingBeforePt !== undefined) m.spacingBefore = Math.round(v.spacingBeforePt * HWPUNIT_PER_PT);
   if (v.spacingAfterPt !== undefined) m.spacingAfter = Math.round(v.spacingAfterPt * HWPUNIT_PER_PT);
   return m;
+}
+
+/** [lily] 문단 스타일 목록(style.list) — studio 서식 줄 스타일 칸과 같은 `getStyleList`. 적용은 `format:apply-style { styleId }` 명령 */
+export interface EmbedStyleListV1 {
+  styles: Array<{ id: number; name: string; englishName: string }>;
+  /** 캐럿 문단의 스타일(studio `cursor-style-changed` 마지막 값). 모르면 null */
+  current: { id: number; name: string } | null;
+}
+
+export function embedStyleList(
+  styles: ReadonlyArray<{ id: number; name: string; englishName?: string }>,
+  current: { id: number; name: string } | null,
+): EmbedStyleListV1 {
+  return {
+    styles: styles.map((x) => ({ id: x.id, name: x.name, englishName: x.englishName ?? '' })),
+    current: current && Number.isInteger(current.id) ? { id: current.id, name: current.name } : null,
+  };
 }

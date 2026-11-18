@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { charMods, embedFormatState, paraMods, parseCharFormat, parseParaFormat } from '../src/embed/format-bridge.ts';
+import { charMods, embedFormatState, embedStyleList, paraMods, parseCharFormat, parseParaFormat } from '../src/embed/format-bridge.ts';
 import { routeEmbedRequest, type EmbedRpcHandlers } from '../src/embed/rpc-router.ts';
 
 test('[lily] embedFormatState는 px·HWPUNIT 을 pt 로 바꾼다', () => {
@@ -11,7 +11,7 @@ test('[lily] embedFormatState는 px·HWPUNIT 을 pt 로 바꾼다', () => {
     { alignment: 'center', lineSpacingType: 'Percent', lineSpacing: 160, marginLeft: 20, marginRight: 0, indent: -10, spacingBefore: 4, spacingAfter: 0 },
   );
   assert.deepEqual(s.char, {
-    fontName: '함초롬바탕', fontSizePt: 10, textColor: '#000000',
+    fontName: '함초롬바탕', fontSizePt: 10, textColor: '#000000', shadeColor: null,
     bold: true, italic: false, underline: false, strikethrough: false, superscript: false, subscript: false,
   });
   assert.deepEqual(s.para, {
@@ -155,4 +155,22 @@ test('[lily] page.setFill · shape.insert 인자를 검증한다', async () => {
   for (const bad of [{ ...shape, kind: 'heart' }, { ...shape, widthMm: 0 }, { ...shape, xMm: -1 }, { ...shape, fill: 'red' }, { ...shape, transparency: 101 }, { ...shape, rotate: 3 }]) {
     await assert.rejects(() => routeEmbedRequest('shape.insert', bad, handlers), JSON.stringify(bad));
   }
+});
+
+test('[lily] 음영(형광펜) shadeColor 읽기·쓰기', async () => {
+  assert.equal(embedFormatState({ shadeColor: '#ffff00' }, null).char.shadeColor, '#ffff00');
+  assert.deepEqual(parseCharFormat({ shadeColor: '#FFFF00' }), { shadeColor: '#ffff00' });
+  assert.deepEqual(charMods({ shadeColor: '#ffffff' }), { shadeColor: '#ffffff' });
+  assert.throws(() => parseCharFormat({ shadeColor: 'yellow' }));
+});
+
+test('[lily] style.list 는 스타일 목록과 캐럿 스타일을 돌려준다', async () => {
+  const list = embedStyleList([{ id: 0, name: '바탕글', englishName: 'Normal' }, { id: 2, name: '개요 1' }], { id: 2, name: '개요 1' });
+  assert.deepEqual(list, {
+    styles: [{ id: 0, name: '바탕글', englishName: 'Normal' }, { id: 2, name: '개요 1', englishName: '' }],
+    current: { id: 2, name: '개요 1' },
+  });
+  assert.equal(embedStyleList([], { id: Number.NaN, name: '?' }).current, null);
+  const handlers = { styleList: async () => list } as unknown as EmbedRpcHandlers;
+  assert.deepEqual(await routeEmbedRequest('style.list', {}, handlers), list);
 });

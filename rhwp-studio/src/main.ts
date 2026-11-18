@@ -64,7 +64,7 @@ import { initThemeSync, setThemeMode, getThemeMode, getEffectiveTheme } from '@/
 import { maybeShowSkinOnboarding } from '@/ui/skin-onboarding-dialog';
 import { analyzeDocumentFonts } from '@/core/document-font-status';
 import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
-import { charMods, embedFormatState, paraMods } from '@/embed/format-bridge';
+import { charMods, embedFormatState, embedStyleList, paraMods } from '@/embed/format-bridge';
 import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { insertTableAtCaret } from '@/embed/table-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
@@ -190,6 +190,11 @@ let canvasView: CanvasView | null = null;
 let embedCaretFontName: string | null = null;
 eventBus.on('cursor-format-changed', (props) => {
   embedCaretFontName = (props as CharProperties | undefined)?.fontFamily ?? null;
+});
+/** [lily] 캐럿 문단의 스타일 — 임베드 호스트 리본 스타일 칸(cursor-style-changed 마지막 값) */
+let embedCaretStyle: { id: number; name: string } | null = null;
+eventBus.on('cursor-style-changed', (info) => {
+  embedCaretStyle = (info as { id: number; name: string } | undefined) ?? null;
 });
 
 /**
@@ -2256,6 +2261,11 @@ installEmbedRuntime({
         ih ? read(() => ih.getCharProperties()) : null,
         ih ? read(() => ih.getParaProperties()) : null,
       );
+    },
+    async styleList() {
+      await initPromise;
+      if (wasm.pageCount === 0) return embedStyleList([], null);
+      try { return embedStyleList(wasm.getStyleList(), embedCaretStyle); } catch { return embedStyleList([], null); }
     },
     async formatSetChar(props) {
       await initPromise;

@@ -20,6 +20,7 @@ import {
   parseParaFormat,
   type EmbedCharFormatV1,
   type EmbedFormatStateV1,
+  type EmbedStyleListV1,
   type EmbedParaFormatV1,
 } from './format-bridge.ts';
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
@@ -102,6 +103,8 @@ export interface EmbedRpcHandlers {
   formatSetChar(props: EmbedCharFormatV1): Promise<{ ok: boolean }>;
   /** 캐럿·선택 문단에 문단 모양 — studio 정렬 단추와 같은 길(실행 취소 기록) */
   formatSetPara(props: EmbedParaFormatV1): Promise<{ ok: boolean }>;
+  /** [lily] 문단 스타일 목록 + 캐럿 문단 스타일(호스트 리본 스타일 칸·갤러리) */
+  styleList(): Promise<EmbedStyleListV1>;
 
   // ── [lily] 상태 표시줄 단·줄·칸 ─────────────────────────────
   /** 캐럿의 단·줄(쪽 안)·칸. 본문 문단이 아니면(표·머리말·각주 안) null */
@@ -371,6 +374,7 @@ export async function routeEmbedRequest(
     case 'format.get': return handlers.formatGet();
     case 'format.setChar': return handlers.formatSetChar(parseCharFormat(params.props));
     case 'format.setPara': return handlers.formatSetPara(parseParaFormat(params.props));
+    case 'style.list': return handlers.styleList();
     case 'status.caret': return handlers.statusCaret();
     case 'select.range': return handlers.selectRange(parseBodyRange(params.range));
     case 'memo.insert':

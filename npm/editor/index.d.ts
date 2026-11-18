@@ -383,6 +383,11 @@ export declare class RhwpEditor {
     setPara(props: RhwpParaFormat): Promise<{ ok: boolean }>;
   };
 
+  /** [lily] 문단 스타일 목록 + 캐럿 문단 스타일. 적용 = commands.execute('format:apply-style', { styleId }) */
+  readonly style: {
+    list(): Promise<{ styles: Array<{ id: number; name: string; englishName: string }>; current: { id: number; name: string } | null }>;
+  };
+
   /** 본문 문단 안 [start, end) 글자(문단 오프셋)를 고르고 화면을 옮긴다. 범위가 문단을 넘으면 selected: false */
   selectRange(range: { section: number; paragraph: number; start: number; end: number }): Promise<{ selected: boolean }>;
 
@@ -549,6 +554,8 @@ export interface RhwpCharFormat {
   subscript?: boolean;
   /** '#rrggbb' */
   textColor?: string;
+  /** [lily] 음영(형광펜) '#rrggbb', 없앰 = '#ffffff' */
+  shadeColor?: string;
 }
 
 export interface RhwpParaFormat {
@@ -569,6 +576,7 @@ export interface RhwpFormatState {
     fontName: string | null;
     fontSizePt: number | null;
     textColor: string | null;
+    shadeColor: string | null;
     bold: boolean;
     italic: boolean;
     underline: boolean;

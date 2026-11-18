@@ -477,6 +477,16 @@ export class RhwpEditor {
     };
   }
 
+  /**
+   * [lily] 문단 스타일 — `list()` = 문서 스타일 목록 + 캐럿 문단 스타일. 적용은
+   * `commands.execute('format:apply-style', { styleId })`(studio 서식 줄 스타일 칸과 같은 명령, 실행 취소 기록).
+   */
+  get style() {
+    return {
+      list: () => this._request('style.list'),
+    };
+  }
+
   /** 상태 표시줄 값 — `caret()` = 캐럿의 단·줄(쪽 안)·칸. 본문 문단이 아니면 null */
   get status() {
     return {
