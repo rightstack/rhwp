@@ -26,6 +26,7 @@ import {
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
 import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
 import { parseTableInsert, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
+import { parseChartInsert, parseChartReplace, type EmbedChartInsertV1, type EmbedChartReplaceV1, type EmbedChartSelectedV1 } from './chart-ops.ts';
 import { parsePageFill, parseShapeInsert, type EmbedPageFillV1, type EmbedPageOpResultV1, type EmbedShapeInsertV1 } from './page-ops.ts';
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
 import { parseMarkdownRules } from './markdown-rules.ts';
@@ -132,6 +133,10 @@ export interface EmbedRpcHandlers {
   /** [lily] 쪽 바탕색 · 꾸밈 도형 */
   pageSetFill(req: EmbedPageFillV1): Promise<EmbedPageOpResultV1>;
   shapeInsert(req: EmbedShapeInsertV1): Promise<EmbedPageOpResultV1>;
+  /** [lily] 차트(그림 + 설명에 실은 정의) 넣기 · 고른 차트 읽기 · 바꾸기 */
+  chartInsert(req: EmbedChartInsertV1): Promise<EmbedPageOpResultV1>;
+  chartSelected(): Promise<EmbedChartSelectedV1 | null>;
+  chartReplace(req: EmbedChartReplaceV1): Promise<EmbedPageOpResultV1>;
 
   // ── [lily] 본문 위치에 글 넣기(줄바꿈 = 문단 나누기, 실행 취소 한 단계) ──
   textInsert(req: EmbedTextInsertV1): Promise<EmbedTextInsertResultV1>;
@@ -401,6 +406,13 @@ export async function routeEmbedRequest(
     case 'shape.insert':
       assertOnlyKeys(params, ['kind', 'xMm', 'yMm', 'widthMm', 'heightMm', 'fill', 'transparency'], 'shape.insert params');
       return handlers.shapeInsert(parseShapeInsert(params));
+    case 'chart.insert':
+      assertOnlyKeys(params, ['png', 'widthMm', 'heightMm', 'description'], 'chart.insert params');
+      return handlers.chartInsert(parseChartInsert(params));
+    case 'chart.selected': return handlers.chartSelected();
+    case 'chart.replace':
+      assertOnlyKeys(params, ['png', 'description', 'widthMm', 'heightMm'], 'chart.replace params');
+      return handlers.chartReplace(parseChartReplace(params));
     case 'text.insert':
       assertOnlyKeys(params, ['section', 'paragraph', 'offset', 'text'], 'text.insert params');
       return handlers.textInsert(parseTextInsert(params));

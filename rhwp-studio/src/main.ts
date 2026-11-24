@@ -68,6 +68,7 @@ import { charMods, embedFormatState, embedStyleList, paraMods } from '@/embed/fo
 import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { insertTableAtCaret } from '@/embed/table-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
+import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
 import { insertFieldAtCaret, listClickHereFields, setFieldValue } from '@/embed/field-ops';
 import { insertTextAt } from '@/embed/text-ops';
 import { MarkdownRules } from '@/embed/markdown-rules';
@@ -2331,6 +2332,21 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return insertDecorShape(inputHandler, req);
+    },
+    async chartInsert(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return insertChart(inputHandler, req);
+    },
+    async chartSelected() {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return null;
+      return selectedChart(inputHandler);
+    },
+    async chartReplace(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return replaceChart(inputHandler, req);
     },
     async textInsert(req) {
       await initPromise;

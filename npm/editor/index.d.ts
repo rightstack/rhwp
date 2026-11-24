@@ -416,6 +416,12 @@ export declare class RhwpEditor {
   readonly shape: {
     insert(shape: { kind: 'ellipse' | 'rectangle' | 'star'; xMm: number; yMm: number; widthMm: number; heightMm: number; fill: string; transparency?: number }): Promise<{ ok: boolean }>;
   };
+  /** [lily] 차트: 그림 + 그림 설명(`lily-chart:` + JSON)에 실은 정의 */
+  readonly chart: {
+    insert(req: { png: string; widthMm: number; heightMm: number; description: string }): Promise<{ ok: boolean }>;
+    selected(): Promise<{ description: string; widthMm: number; heightMm: number } | null>;
+    replace(req: { png: string; description: string; widthMm?: number; heightMm?: number }): Promise<{ ok: boolean }>;
+  };
   readonly table: {
     /**
      * 캐럿(선택이 있으면 그 시작) 자리에 rows × cols 표. `cells[행][열]` = 칸의 글(줄바꿈 없는 한 문단, 없으면 빈 칸).

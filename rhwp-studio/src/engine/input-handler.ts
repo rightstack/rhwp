@@ -4794,8 +4794,29 @@ export class InputHandler {
     return this.cursor.positionOutsideSelectedPicture();
   }
 
+  /** [lily] embed chart: 고른 개체의 속성(그림 설명 포함) */
+  lilyPictureProps(ref: { sec: number; ppi: number; ci: number; type: 'image' | 'shape' | 'equation' | 'group' | 'line' | 'ole' }): any {
+    return this.getObjectProperties(ref);
+  }
+
+  /** [lily] embed chart: 구역의 쪽 크기·좌우 여백(HWPUNIT) — 크기 손잡이 맞춤선용 */
+  lilyPageDef(sec: number): { width: number; marginLeft: number; marginRight: number } {
+    const d = this.wasm.getPageDef(sec);
+    return { width: d.width, marginLeft: d.marginLeft, marginRight: d.marginRight };
+  }
+
+  /** [lily] embed chart: 본문 그림 하나를 개체 선택한다(넣은 직후) */
+  lilySelectObject(sec: number, ppi: number, ci: number): void {
+    this.eventBus.emit('document-changed');
+    this.cursor.enterPictureObjectSelectionDirect(sec, ppi, ci, 'image');
+    this.caret.hide();
+    this.selectionRenderer.clear();
+    this.renderPictureObjectSelection();
+    this.eventBus.emit('picture-object-selection-changed', true);
+  }
+
   /** 다중 선택된 개체 목록 */
-  getSelectedPictureRefs(): { sec: number; ppi: number; ci: number; type: string }[] { return this.cursor.getSelectedPictureRefs(); }
+  getSelectedPictureRefs():{ sec: number; ppi: number; ci: number; type: string }[] { return this.cursor.getSelectedPictureRefs(); }
 
   /** 다중 선택 상태인가? */
   isMultiPictureSelection(): boolean { return this.cursor.isMultiPictureSelection(); }

@@ -545,6 +545,18 @@ export class RhwpEditor {
     return { insert: (shape) => this._request('shape.insert', shape) };
   }
 
+  /**
+   * [lily] 차트(그림 + 그림 설명에 실은 `lily-chart:` 정의) — `insert({ png(base64), widthMm, heightMm, description })`,
+   * `selected()`(고른 개체가 차트 그림이면 { description, widthMm, heightMm }, 아니면 null), `replace({ png, description, widthMm?, heightMm? })`.
+   */
+  get chart() {
+    return {
+      insert: (req) => this._request('chart.insert', req),
+      selected: () => this._request('chart.selected', {}),
+      replace: (req) => this._request('chart.replace', req),
+    };
+  }
+
   get table() {
     return {
       // [lily] look = { widthsMm?, heightsMm?, format? } — 칸 너비 · 줄 높이 · 범위별 꾸밈(바탕 · 테두리 · 맞춤 · 글자)
