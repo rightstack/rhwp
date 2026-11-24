@@ -27,7 +27,10 @@ import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoIns
 import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
 import { parseTableInsert, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
 import { parseChartInsert, parseChartReplace, type EmbedChartInsertV1, type EmbedChartReplaceV1, type EmbedChartSelectedV1 } from './chart-ops.ts';
-import { parsePictureInsert, type EmbedPictureInsertV1 } from './picture-ops.ts';
+import {
+  parsePictureImage, parsePictureInsert, parsePictureList, parsePictureRefs, parsePictureUpdate,
+  type EmbedPictureInfoV1, type EmbedPictureInsertResultV1, type EmbedPictureInsertV1, type EmbedPictureListV1, type EmbedPictureRefsV1, type EmbedPictureRefV1, type EmbedPictureUpdateV1,
+} from './picture-ops.ts';
 import { parsePageFill, parseShapeInsert, type EmbedPageFillV1, type EmbedPageOpResultV1, type EmbedShapeInsertV1 } from './page-ops.ts';
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
 import { parseMarkdownRules } from './markdown-rules.ts';
@@ -135,7 +138,14 @@ export interface EmbedRpcHandlers {
   pageSetFill(req: EmbedPageFillV1): Promise<EmbedPageOpResultV1>;
   shapeInsert(req: EmbedShapeInsertV1): Promise<EmbedPageOpResultV1>;
   /** [lily] 차트(그림 + 설명에 실은 정의) 넣기 · 고른 차트 읽기 · 바꾸기 */
-  pictureInsert(req: EmbedPictureInsertV1): Promise<EmbedPageOpResultV1>;
+  pictureInsert(req: EmbedPictureInsertV1): Promise<EmbedPictureInsertResultV1>;
+  /** [lily] 떠 있는 그림 목록 · 고른 그림 · 고르기 · 고치기 · 지우기 · 원본 바이트 */
+  pictureList(req: { descriptionPrefix?: string }): Promise<EmbedPictureListV1>;
+  pictureSelected(): Promise<{ items: EmbedPictureInfoV1[] }>;
+  pictureSelect(req: EmbedPictureRefsV1): Promise<{ ok: boolean }>;
+  pictureUpdate(req: EmbedPictureUpdateV1): Promise<{ ok: boolean }>;
+  pictureDelete(req: EmbedPictureRefsV1): Promise<{ ok: boolean }>;
+  pictureImage(req: EmbedPictureRefV1): Promise<{ data: string } | null>;
   chartInsert(req: EmbedChartInsertV1): Promise<EmbedPageOpResultV1>;
   chartSelected(): Promise<EmbedChartSelectedV1 | null>;
   chartReplace(req: EmbedChartReplaceV1): Promise<EmbedPageOpResultV1>;
@@ -409,8 +419,24 @@ export async function routeEmbedRequest(
       assertOnlyKeys(params, ['kind', 'xMm', 'yMm', 'widthMm', 'heightMm', 'fill', 'transparency'], 'shape.insert params');
       return handlers.shapeInsert(parseShapeInsert(params));
     case 'picture.insert':
-      assertOnlyKeys(params, ['png', 'widthMm', 'heightMm', 'xMm', 'yMm', 'rotationDeg', 'description'], 'picture.insert params');
+      assertOnlyKeys(params, ['png', 'widthMm', 'heightMm', 'xMm', 'yMm', 'rotationDeg', 'description', 'page'], 'picture.insert params');
       return handlers.pictureInsert(parsePictureInsert(params));
+    case 'picture.list':
+      assertOnlyKeys(params, ['descriptionPrefix'], 'picture.list params');
+      return handlers.pictureList(parsePictureList(params));
+    case 'picture.selected': return handlers.pictureSelected();
+    case 'picture.select':
+      assertOnlyKeys(params, ['items'], 'picture.select params');
+      return handlers.pictureSelect(parsePictureRefs(params));
+    case 'picture.update':
+      assertOnlyKeys(params, ['items', 'select'], 'picture.update params');
+      return handlers.pictureUpdate(parsePictureUpdate(params));
+    case 'picture.delete':
+      assertOnlyKeys(params, ['items'], 'picture.delete params');
+      return handlers.pictureDelete(parsePictureRefs(params));
+    case 'picture.image':
+      assertOnlyKeys(params, ['sec', 'para', 'ci'], 'picture.image params');
+      return handlers.pictureImage(parsePictureImage(params));
     case 'chart.insert':
       assertOnlyKeys(params, ['png', 'widthMm', 'heightMm', 'description'], 'chart.insert params');
       return handlers.chartInsert(parseChartInsert(params));

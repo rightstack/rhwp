@@ -423,13 +423,23 @@ impl DocumentCore {
         // description 내 JSON 제어 문자 이스케이프
         let desc_escaped = crate::document_core::helpers::json_escape(&c.description);
         // [Task #741 후속] 외부 file path (HWP3 외부 그림) 영역 영역 dialog 표시 영역
-        let external_path_field = match &pic.image_attr.external_path {
+        let mut external_path_field = match &pic.image_attr.external_path {
             Some(p) => format!(
                 ",\"externalPath\":\"{}\"",
                 crate::document_core::helpers::json_escape(p)
             ),
             None => String::new(),
         };
+        // [lily] 돌린 그림의 width·height 는 돌린 바깥 상자다 — 임베드 호스트가 돌리기 전 크기와 앞뒤(z)를 읽게 같이 낸다
+        {
+            let sa = &pic.shape_attr;
+            let cur_w = if sa.current_width > 0 { sa.current_width } else { c.width };
+            let cur_h = if sa.current_height > 0 { sa.current_height } else { c.height };
+            external_path_field.push_str(&format!(
+                ",\"currentWidth\":{},\"currentHeight\":{},\"zOrder\":{}",
+                cur_w, cur_h, c.z_order
+            ));
+        }
 
         let sa = &pic.shape_attr;
         let (crop_left, crop_top, crop_right, crop_bottom) = Self::picture_crop_ui_amounts(pic);
@@ -1093,6 +1103,11 @@ impl DocumentCore {
         }
         if let Some(v) = json_i32(props_json, "horzOffset") {
             pic.common.horizontal_offset = v as u32;
+        }
+        // [lily] 겹친 그림의 앞뒤(맨 앞으로 · 맨 뒤로) — 그림은 changeShapeZOrder(도형만) 밖이라 절대값으로 받는다.
+        // 렌더 정렬키(plane, zOrder, stableIndex)의 zOrder 와 HWP·HWPX 저장값이 이 필드다.
+        if let Some(v) = json_i32(props_json, "zOrder") {
+            pic.common.z_order = v;
         }
         Self::sync_common_obj_attr_known_bits(&mut pic.common);
 

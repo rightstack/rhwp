@@ -4821,6 +4821,23 @@ export class InputHandler {
     this.eventBus.emit('picture-object-selection-changed', true);
   }
 
+  /** [lily] embed picture.select: 본문 그림 여럿을 개체 선택한다(하나면 단일 선택, 빈 목록이면 선택 해제) */
+  lilySelectObjects(refs: { sec: number; ppi: number; ci: number }[]): void {
+    if (refs.length === 0) {
+      if (this.cursor.isInPictureObjectSelection()) this.exitPictureObjectSelectionIfNeeded();
+      return;
+    }
+    this.cursor.clearSelection();
+    this.cursor.enterPictureObjectSelectionDirect(refs[0].sec, refs[0].ppi, refs[0].ci, 'image');
+    for (const r of refs.slice(1)) this.cursor.togglePictureObjectSelection(r.sec, r.ppi, r.ci, 'image');
+    this.active = true;
+    this.caret.hide();
+    this.selectionRenderer.clear();
+    this.renderPictureObjectSelection();
+    this.eventBus.emit('picture-object-selection-changed', true);
+    this.textarea.focus();
+  }
+
   /** 다중 선택된 개체 목록 */
   getSelectedPictureRefs():{ sec: number; ppi: number; ci: number; type: string }[] { return this.cursor.getSelectedPictureRefs(); }
 

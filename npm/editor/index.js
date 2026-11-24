@@ -550,11 +550,21 @@ export class RhwpEditor {
    * `selected()`(고른 개체가 차트 그림이면 { description, widthMm, heightMm }, 아니면 null), `replace({ png, description, widthMm?, heightMm? })`.
    */
   /**
-   * [lily] 떠 있는 그림 — `insert({ png(base64), widthMm, heightMm, xMm?, yMm?, rotationDeg?, description? })`: 글 앞으로, 종이 기준 자리(생략하면
-   * 캐럿 구역 글 영역 한가운데)에 넣고 고른다. 투명도는 PNG 알파에 담는다.
+   * [lily] 떠 있는 그림 — `insert({ png(base64), widthMm, heightMm, xMm?, yMm?, rotationDeg?, description?, page? })`: 글 앞으로, 종이 기준 자리(생략하면
+   * 캐럿 구역 글 영역 한가운데, page 를 주면 그 쪽 기준 + 그 자리 아래 글에 닻)에 넣고 고른다. 투명도는 PNG 알파에 담는다.
+   * `list({ descriptionPrefix? })` · `selected()` · `select({ items })` · `update({ items, select? })` · `delete({ items })` · `image({ sec, para, ci })` —
+   * 호스트가 그린 떠 있는 그림을 호스트 UI 로 고친다(바꿈은 실행 취소 한 단계).
    */
   get picture() {
-    return { insert: (req) => this._request('picture.insert', req) };
+    return {
+      insert: (req) => this._request('picture.insert', req),
+      list: (req = {}) => this._request('picture.list', req),
+      selected: () => this._request('picture.selected', {}),
+      select: (req) => this._request('picture.select', req),
+      update: (req) => this._request('picture.update', req),
+      delete: (req) => this._request('picture.delete', req),
+      image: (ref) => this._request('picture.image', ref),
+    };
   }
 
   get chart() {

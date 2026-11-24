@@ -418,7 +418,13 @@ export declare class RhwpEditor {
   };
   /** [lily] 글 앞으로 떠 있는 그림(종이 기준 자리 mm, 생략하면 글 영역 한가운데, 회전은 도) */
   readonly picture: {
-    insert(req: { png: string; widthMm: number; heightMm: number; xMm?: number; yMm?: number; rotationDeg?: number; description?: string }): Promise<{ ok: boolean }>;
+    insert(req: { png: string; widthMm: number; heightMm: number; xMm?: number; yMm?: number; rotationDeg?: number; description?: string; page?: number }): Promise<{ ok: boolean; ref?: RhwpPictureRef }>;
+    list(req?: { descriptionPrefix?: string }): Promise<{ pages: { widthMm: number; heightMm: number }[]; items: RhwpPictureInfo[] }>;
+    selected(): Promise<{ items: RhwpPictureInfo[] }>;
+    select(req: { items: RhwpPictureRef[] }): Promise<{ ok: boolean }>;
+    update(req: { items: RhwpPictureUpdate[]; select?: boolean }): Promise<{ ok: boolean }>;
+    delete(req: { items: RhwpPictureRef[] }): Promise<{ ok: boolean }>;
+    image(ref: RhwpPictureRef): Promise<{ data: string } | null>;
   };
   /** [lily] 차트: 그림 + 그림 설명(`lily-chart:` + JSON)에 실은 정의 */
   readonly chart: {
@@ -646,3 +652,10 @@ export declare function createStudio(
   container: string | HTMLElement,
   options?: StudioOptions,
 ): Promise<RhwpEditor>;
+
+/** [lily] 본문 그림 하나(구역 · 문단 · 컨트롤 번호) */
+export interface RhwpPictureRef { sec: number; para: number; ci: number }
+/** [lily] 떠 있는 그림: 쪽(0부터) · 가운데(쪽 종이 기준 mm) · 돌리기 전 크기(mm) · 각도(-180, 180] · 설명 · 잠금(크기 고정) · z */
+export interface RhwpPictureInfo extends RhwpPictureRef { page: number; cxMm: number; cyMm: number; widthMm: number; heightMm: number; rotationDeg: number; description: string; locked: boolean; zOrder: number }
+/** [lily] 그림 고치기: 그림(png) · 돌리기 전 크기(가운데 유지) · 옮기기 · 각도 · 설명 · 잠금 · 맨 앞/맨 뒤 */
+export interface RhwpPictureUpdate extends RhwpPictureRef { png?: string; widthMm?: number; heightMm?: number; dxMm?: number; dyMm?: number; rotationDeg?: number; description?: string; locked?: boolean; order?: 'front' | 'back' }

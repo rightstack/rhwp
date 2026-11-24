@@ -69,7 +69,7 @@ import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { insertTableAtCaret } from '@/embed/table-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
-import { insertFloatingPicture } from '@/embed/picture-ops';
+import { deletePictures, insertFloatingPicture, listPictures, pictureImage, selectedPictures, selectPictures, updatePictures } from '@/embed/picture-ops';
 import { insertFieldAtCaret, listClickHereFields, setFieldValue } from '@/embed/field-ops';
 import { insertTextAt } from '@/embed/text-ops';
 import { MarkdownRules } from '@/embed/markdown-rules';
@@ -2337,7 +2337,37 @@ installEmbedRuntime({
     async pictureInsert(req) {
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
-      return insertFloatingPicture(inputHandler, req);
+      return insertFloatingPicture(inputHandler, wasm, req);
+    },
+    async pictureList(req) {
+      await initPromise;
+      if (wasm.pageCount === 0) return { pages: [], items: [] };
+      return listPictures(wasm, req.descriptionPrefix);
+    },
+    async pictureSelected() {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { items: [] };
+      return selectedPictures(inputHandler, wasm);
+    },
+    async pictureSelect(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return selectPictures(inputHandler, req);
+    },
+    async pictureUpdate(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return updatePictures(inputHandler, wasm, req);
+    },
+    async pictureDelete(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return deletePictures(inputHandler, req);
+    },
+    async pictureImage(req) {
+      await initPromise;
+      if (wasm.pageCount === 0) return null;
+      return pictureImage(wasm, req);
     },
     async chartInsert(req) {
       await initPromise;

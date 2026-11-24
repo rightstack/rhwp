@@ -563,6 +563,8 @@ export class CanvasView {
 
   /** 페이지 요소(캔버스·오버레이)에 현재 레이아웃 좌표를 적용하는 단일 관문. */
   private positionPageElement(element: HTMLElement, pageIdx: number): void {
+    // [lily] 임베드 호스트가 화면 좌표 ↔ 쪽을 동기로 잇도록 쪽 캔버스에 쪽 번호(0부터)를 단다
+    if (element instanceof HTMLCanvasElement) element.dataset.lilyPage = String(pageIdx);
     element.style.top = `${this.virtualScroll.getPageOffset(pageIdx)}px`;
 
     // 그리드/광폭 팬: 고정 left 좌표, 단일 열: CSS 중앙 정렬
@@ -1621,6 +1623,7 @@ export class CanvasView {
         this.canvasPool.replace(pageIdx, canvas, renderedCanvas);
       }
       renderedCanvas.classList.add('document-page-canvas');
+      renderedCanvas.dataset.lilyPage = String(pageIdx); // [lily] 위 positionPageElement 와 같은 표지
       const canvaskitDiagnostics = this.pageRenderer.getBackend() === 'canvaskit'
         ? this.pageRenderer.getCanvasKitRenderDiagnostics(pageIdx)
         : null;
