@@ -1537,6 +1537,10 @@ impl DocumentCore {
                 right: (natural_width_px * 75) as i32,
                 bottom: (natural_height_px * 75) as i32,
             };
+            // [lily] 자르기 기준 범위(imgDim)도 새 그림으로 — 삽입(insert_picture)과 같은 값.
+            // 옛 그림의 범위가 남으면 픽셀 크기가 다른 그림으로 바꿀 때 새 자르기 좌표가 옛 범위에
+            // 견주어져 그림이 틀 안에서 줄거나 잘린 채 그려진다(테이프 길이 · 차트 크기 바꾸기).
+            pic.img_dim = (natural_width_px * 75, natural_height_px * 75);
         }
 
         let section = &mut self.document.sections[section_idx];

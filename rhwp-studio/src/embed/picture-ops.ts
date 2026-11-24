@@ -340,9 +340,15 @@ function zRange(wasm: WasmBridge, sec: number): { min: number; max: number } {
   let max = -Infinity;
   for (let p = 0; p < wasm.pageCount; p++) {
     for (const c of layoutOf(wasm, p)) {
-      if (c.secIdx !== sec || typeof c.zOrder !== 'number' || c.type === 'table') continue;
-      min = Math.min(min, c.zOrder);
-      max = Math.max(max, c.zOrder);
+      if (c.secIdx !== sec || c.type === 'table') continue;
+      // 그림은 저장된 z(엔진 게터 zOrder) — 레이아웃 값과 다를 수 있다
+      let z = typeof c.zOrder === 'number' ? c.zOrder : undefined;
+      if (isBodyImage(c)) {
+        try { const v = (wasm.getPictureProperties(c.secIdx!, c.paraIdx!, c.controlIdx!) as unknown as Record<string, unknown>).zOrder; if (typeof v === 'number') z = v; } catch { /* 레이아웃 값 */ }
+      }
+      if (z === undefined) continue;
+      min = Math.min(min, z);
+      max = Math.max(max, z);
     }
   }
   return min === Infinity ? { min: 0, max: 0 } : { min, max };
