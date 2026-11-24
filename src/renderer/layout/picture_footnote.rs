@@ -885,11 +885,29 @@ impl LayoutEngine {
                 ..ImageNode::new(bin_data_id, image_data)
             })
         };
-        let img_node = RenderNode::new(
-            img_id,
-            node_type,
-            BoundingBox::new(adjusted_pic_x, pic_y, pic_width, pic_height),
-        );
+        // [lily] 돌린 그림: common 은 돌린 뒤 외접 틀이고 current 가 실제로 돌릴 그림 크기다 —
+        // layout_picture_full 과 같이 current 이미지를 common 틀 가운데에 두고 돌린다(외접 틀 크기로
+        // 늘려 그리면 그림이 틀 비율로 일그러진다). 자리 · 흐름 · 캡션은 그대로 common 틀 기준.
+        let uses_rotated_frame = picture.shape_attr.rotation_angle.rem_euclid(360) != 0
+            && picture.shape_attr.current_width > 0
+            && picture.shape_attr.current_height > 0
+            && picture.common.width > 0
+            && picture.common.height > 0;
+        let node_box = if uses_rotated_frame {
+            rotated_frame_node_box(
+                adjusted_pic_x,
+                pic_y,
+                pic_width,
+                pic_height,
+                (
+                    hwpunit_to_px(picture.shape_attr.current_width as i32, self.dpi),
+                    hwpunit_to_px(picture.shape_attr.current_height as i32, self.dpi),
+                ),
+            )
+        } else {
+            BoundingBox::new(adjusted_pic_x, pic_y, pic_width, pic_height)
+        };
+        let img_node = RenderNode::new(img_id, node_type, node_box);
 
         parent_node.children.push(img_node);
 
@@ -898,10 +916,10 @@ impl LayoutEngine {
             tree,
             parent_node,
             picture,
-            adjusted_pic_x,
-            pic_y,
-            pic_width,
-            pic_height,
+            node_box.x,
+            node_box.y,
+            node_box.width,
+            node_box.height,
         );
 
         // 캡션 렌더링
