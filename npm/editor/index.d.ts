@@ -416,6 +416,10 @@ export declare class RhwpEditor {
   readonly shape: {
     insert(shape: { kind: 'ellipse' | 'rectangle' | 'star'; xMm: number; yMm: number; widthMm: number; heightMm: number; fill: string; transparency?: number }): Promise<{ ok: boolean }>;
   };
+  /** [lily] 글 앞으로 떠 있는 그림(종이 기준 자리 mm, 생략하면 글 영역 한가운데, 회전은 도) */
+  readonly picture: {
+    insert(req: { png: string; widthMm: number; heightMm: number; xMm?: number; yMm?: number; rotationDeg?: number; description?: string }): Promise<{ ok: boolean }>;
+  };
   /** [lily] 차트: 그림 + 그림 설명(`lily-chart:` + JSON)에 실은 정의 */
   readonly chart: {
     insert(req: { png: string; widthMm: number; heightMm: number; description: string }): Promise<{ ok: boolean }>;

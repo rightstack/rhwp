@@ -4805,6 +4805,12 @@ export class InputHandler {
     return { width: d.width, marginLeft: d.marginLeft, marginRight: d.marginRight };
   }
 
+  /** [lily] embed picture.insert: 구역의 쪽 크기·여백 전부(HWPUNIT) */
+  lilyPageDefFull(sec: number): { width: number; height: number; marginLeft: number; marginRight: number; marginTop: number; marginBottom: number } {
+    const d = this.wasm.getPageDef(sec);
+    return { width: d.width, height: d.height, marginLeft: d.marginLeft, marginRight: d.marginRight, marginTop: d.marginTop, marginBottom: d.marginBottom };
+  }
+
   /** [lily] embed chart: 본문 그림 하나를 개체 선택한다(넣은 직후) */
   lilySelectObject(sec: number, ppi: number, ci: number): void {
     this.eventBus.emit('document-changed');

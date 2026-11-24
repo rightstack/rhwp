@@ -27,6 +27,7 @@ import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoIns
 import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
 import { parseTableInsert, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
 import { parseChartInsert, parseChartReplace, type EmbedChartInsertV1, type EmbedChartReplaceV1, type EmbedChartSelectedV1 } from './chart-ops.ts';
+import { parsePictureInsert, type EmbedPictureInsertV1 } from './picture-ops.ts';
 import { parsePageFill, parseShapeInsert, type EmbedPageFillV1, type EmbedPageOpResultV1, type EmbedShapeInsertV1 } from './page-ops.ts';
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
 import { parseMarkdownRules } from './markdown-rules.ts';
@@ -134,6 +135,7 @@ export interface EmbedRpcHandlers {
   pageSetFill(req: EmbedPageFillV1): Promise<EmbedPageOpResultV1>;
   shapeInsert(req: EmbedShapeInsertV1): Promise<EmbedPageOpResultV1>;
   /** [lily] 차트(그림 + 설명에 실은 정의) 넣기 · 고른 차트 읽기 · 바꾸기 */
+  pictureInsert(req: EmbedPictureInsertV1): Promise<EmbedPageOpResultV1>;
   chartInsert(req: EmbedChartInsertV1): Promise<EmbedPageOpResultV1>;
   chartSelected(): Promise<EmbedChartSelectedV1 | null>;
   chartReplace(req: EmbedChartReplaceV1): Promise<EmbedPageOpResultV1>;
@@ -406,6 +408,9 @@ export async function routeEmbedRequest(
     case 'shape.insert':
       assertOnlyKeys(params, ['kind', 'xMm', 'yMm', 'widthMm', 'heightMm', 'fill', 'transparency'], 'shape.insert params');
       return handlers.shapeInsert(parseShapeInsert(params));
+    case 'picture.insert':
+      assertOnlyKeys(params, ['png', 'widthMm', 'heightMm', 'xMm', 'yMm', 'rotationDeg', 'description'], 'picture.insert params');
+      return handlers.pictureInsert(parsePictureInsert(params));
     case 'chart.insert':
       assertOnlyKeys(params, ['png', 'widthMm', 'heightMm', 'description'], 'chart.insert params');
       return handlers.chartInsert(parseChartInsert(params));

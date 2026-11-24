@@ -549,6 +549,14 @@ export class RhwpEditor {
    * [lily] 차트(그림 + 그림 설명에 실은 `lily-chart:` 정의) — `insert({ png(base64), widthMm, heightMm, description })`,
    * `selected()`(고른 개체가 차트 그림이면 { description, widthMm, heightMm }, 아니면 null), `replace({ png, description, widthMm?, heightMm? })`.
    */
+  /**
+   * [lily] 떠 있는 그림 — `insert({ png(base64), widthMm, heightMm, xMm?, yMm?, rotationDeg?, description? })`: 글 앞으로, 종이 기준 자리(생략하면
+   * 캐럿 구역 글 영역 한가운데)에 넣고 고른다. 투명도는 PNG 알파에 담는다.
+   */
+  get picture() {
+    return { insert: (req) => this._request('picture.insert', req) };
+  }
+
   get chart() {
     return {
       insert: (req) => this._request('chart.insert', req),
