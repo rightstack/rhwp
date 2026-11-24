@@ -80,6 +80,23 @@ export class TableObjectRenderer {
   private static readonly HANDLE_SIZE = 8; // px (화면 고정)
   private static readonly ROTATE_HANDLE_SIZE = 10; // px
   private static readonly ROTATE_HANDLE_GAP = 20; // px (상단 중앙에서 위로)
+  /**
+   * [lily] 회전 손잡이 크기 · 간격 · 연결선을 임베드 호스트 스킨이 CSS 변수로 바꾼다(기본은 upstream 값):
+   * `--rhwp-rotate-handle-size`(px) · `--rhwp-rotate-handle-gap`(틀 위 가운데 → 손잡이 가운데, px) · `--rhwp-rotate-stem: none`(연결선 없음).
+   * 손잡이 요소에는 `rhwp-rotate-handle` class 가 붙어 스킨이 꼴(원 단추 + 아이콘)을 입힌다. 누름 판정도 같은 크기를 쓴다.
+   */
+  private static rotateMetrics(): { size: number; gap: number; stem: boolean } {
+    const css = getComputedStyle(document.documentElement);
+    const num = (name: string, fallback: number) => {
+      const v = parseFloat(css.getPropertyValue(name));
+      return Number.isFinite(v) && v > 0 ? v : fallback;
+    };
+    return {
+      size: num('--rhwp-rotate-handle-size', TableObjectRenderer.ROTATE_HANDLE_SIZE),
+      gap: num('--rhwp-rotate-handle-gap', TableObjectRenderer.ROTATE_HANDLE_GAP),
+      stem: css.getPropertyValue('--rhwp-rotate-stem').trim() !== 'none',
+    };
+  }
 
   constructor(
     private container: HTMLElement,
@@ -160,13 +177,14 @@ export class TableObjectRenderer {
 
     // 회전 핸들 (도형 위쪽 방향으로 gap만큼 이동)
     if (this.showRotateHandle) {
-      const rhs = TableObjectRenderer.ROTATE_HANDLE_SIZE;
+      const rm = TableObjectRenderer.rotateMetrics();
+      const rhs = rm.size;
       const rhalf = rhs / 2;
-      const gap = TableObjectRenderer.ROTATE_HANDLE_GAP;
+      const gap = rm.gap;
       const [topCx, topCy] = rot(0, -h / 2);
       const [rcx, rcy] = rot(0, -h / 2 - gap);
 
-      if (!locked) {
+      if (!locked && rm.stem) {
         // 연결선 (SVG)
         const svgEl = document.createElement('div');
         svgEl.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;';
@@ -187,6 +205,7 @@ export class TableObjectRenderer {
           `left:${rcx - rhalf}px;top:${rcy - rhalf}px;` +
           `width:${rhs}px;height:${rhs}px;` +
           `background:#4CAF50;border:1px solid #388E3C;border-radius:50%;box-sizing:border-box;pointer-events:none;`;
+        el.classList.add('rhwp-rotate-handle'); // [lily] 스킨이 꼴을 입힌다
       }
       this.layer.appendChild(el);
       this.handles.push({ dir: 'rotate', el, cx: rcx, cy: rcy });
@@ -271,13 +290,14 @@ export class TableObjectRenderer {
 
       // 회전 핸들 (그림/글상자 전용)
       if (this.showRotateHandle) {
-        const rhs = TableObjectRenderer.ROTATE_HANDLE_SIZE;
+        const rm = TableObjectRenderer.rotateMetrics();
+        const rhs = rm.size;
         const rhalf = rhs / 2;
-        const gap = TableObjectRenderer.ROTATE_HANDLE_GAP;
+        const gap = rm.gap;
         const rcx = l + w / 2;
         const rcy = t - gap;
 
-        if (!locked) {
+        if (!locked && rm.stem) {
           // 연결선: 상단 중앙 → 회전 핸들
           const line = document.createElement('div');
           line.style.cssText =
@@ -297,6 +317,7 @@ export class TableObjectRenderer {
             `left:${rcx - rhalf}px;top:${rcy - rhalf}px;` +
             `width:${rhs}px;height:${rhs}px;` +
             `background:#4CAF50;border:1px solid #388E3C;border-radius:50%;box-sizing:border-box;pointer-events:none;`;
+        el.classList.add('rhwp-rotate-handle'); // [lily] 스킨이 꼴을 입힌다
         }
         this.layer.appendChild(el);
         this.handles.push({ dir: 'rotate', el, cx: rcx, cy: rcy });
@@ -365,7 +386,7 @@ export class TableObjectRenderer {
     // 회전 핸들 우선 검사 (더 작은 원형이므로 먼저 체크)
     for (const h of this.handles) {
       if (h.dir === 'rotate') {
-        const rt = TableObjectRenderer.ROTATE_HANDLE_SIZE / 2 + 2;
+        const rt = TableObjectRenderer.rotateMetrics().size / 2 + 2;
         if (Math.abs(x - h.cx) <= rt && Math.abs(y - h.cy) <= rt) {
           return h.dir;
         }
