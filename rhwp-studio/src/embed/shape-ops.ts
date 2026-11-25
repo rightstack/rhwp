@@ -18,6 +18,8 @@
  * - shape.editText { sec, para, ci }    : 도형 글 편집에 들어간다(글 영역이 없으면 만든다)
  * - shape.group { items } · shape.ungroup { sec, para, ci }
  * - shape.setTyping { on }              : 도형을 고른 채 치는 글자 = 도형 글(기본 꺼짐)
+ * - shape.image { sec, para, ci }       : 그 도형 하나만 그린 그림(돌리기 전 꼴, SVG data URL, 둘레 8px 여유) — 호스트가 끄는 동안 틀 안에 보인다
+ * shape.selected 는 캐럿이 본문 도형의 글 안이면 그 도형을 editing: true 로 돌려준다(호스트 [도형] 패널이 글 편집 중에도 그 도형에)
  */
 import type { InputHandler } from '../engine/input-handler.ts';
 import type { WasmBridge } from '../core/wasm-bridge.ts';
@@ -80,6 +82,8 @@ export interface EmbedShapeInfoV1 extends EmbedShapeRefV1 {
   hasText: boolean;
   canText: boolean;
   description: string;
+  /** 캐럿이 이 도형의 글 안(개체 선택 아님) */
+  editing?: boolean;
 }
 export interface EmbedShapeUpdateItemV1 extends EmbedShapeRefV1 {
   widthMm?: number;
@@ -419,7 +423,20 @@ export function listShapes(wasm: WasmBridge): { pages: { widthMm: number; height
 
 /** 지금 고른 본문 도형들(고른 차례). 도형 아닌 개체가 섞였으면 빈 목록 */
 export function selectedShapes(ih: InputHandler, wasm: WasmBridge): { items: EmbedShapeInfoV1[] } {
-  if (!ih.isInPictureObjectSelection()) return { items: [] };
+  if (!ih.isInPictureObjectSelection()) {
+    // 도형 글 편집 중: 캐럿이 본문 도형의 글 영역 안
+    const pos = ih.getCursorPosition() as { isTextBox?: boolean; sectionIndex: number; parentParaIndex?: number; controlIndex?: number; cellPath?: unknown[] };
+    if (!pos.isTextBox || pos.parentParaIndex === undefined || pos.controlIndex === undefined || (pos.cellPath?.length ?? 0) > 1) return { items: [] };
+    const key = `${pos.sectionIndex}:${pos.parentParaIndex}:${pos.controlIndex}`;
+    for (let p = 0; p < wasm.pageCount; p++) {
+      for (const c of layoutOf(wasm, p)) {
+        if (!isBodyShape(c) || `${c.secIdx}:${c.paraIdx}:${c.controlIdx}` !== key) continue;
+        const it = infoOf(wasm, p, c);
+        return { items: it ? [{ ...it, editing: true }] : [] };
+      }
+    }
+    return { items: [] };
+  }
   type Ref = { sec: number; ppi: number; ci: number; type: string; cellPath?: unknown[]; cellIdx?: number; headerFooter?: unknown; noteRef?: unknown };
   const one = ih.getSelectedPictureRef() as Ref | null;
   const refs = (ih.isMultiPictureSelection() ? ih.getSelectedPictureRefs() : one ? [one] : []) as Ref[];
@@ -597,4 +614,29 @@ export function ungroupShape(ih: InputHandler, req: EmbedShapeRefV1): { ok: bool
 
 export function editShapeText(ih: InputHandler, req: EmbedShapeRefV1): { ok: boolean } {
   return { ok: ih.lilyEditShapeText(req.sec, req.para, req.ci) };
+}
+
+/** 그 도형 하나만 그린 그림(SVG data URL, 돌리기 전 꼴 — 상자 = 돌리기 전 틀). 도형이 아니거나 그려지지 않았으면 null */
+export function shapeImage(wasm: WasmBridge, ref: EmbedShapeRefV1): { data: string } | null {
+  for (let p = 0; p < wasm.pageCount; p++) {
+    if (!layoutOf(wasm, p).some((c) => isBodyShape(c) && c.secIdx === ref.sec && c.paraIdx === ref.para && c.controlIdx === ref.ci)) continue;
+    try {
+      const r = wasm.lilyShapeSvg(p, ref.sec, ref.para, ref.ci);
+      if (!r.ok || !r.svg || !r.w || !r.h) return null;
+      const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+      const root = doc.documentElement;
+      if (root.nodeName !== 'svg') return null;
+      // 선 굵기 · 그림자가 상자 밖으로 나가도 보이게 둘레 여유 8px(호스트는 이 여유를 음수 자르기로 틀 밖에 그린다)
+      const pad = 8;
+      root.setAttribute('viewBox', `${r.x! - pad} ${r.y! - pad} ${r.w + pad * 2} ${r.h + pad * 2}`);
+      root.setAttribute('width', String(r.w + pad * 2));
+      root.setAttribute('height', String(r.h + pad * 2));
+      root.setAttribute('preserveAspectRatio', 'none');
+      const text = new XMLSerializer().serializeToString(root);
+      return { data: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}` };
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }

@@ -329,6 +329,49 @@ impl DocumentCore {
         self.lily_after_shape_change(sec);
         Ok("{\"ok\":true,\"created\":true}".to_string())
     }
+    /// 도형 하나만 그린 SVG(돌리기 전 꼴) + 그 상자(쪽 px) — `{"ok":true,"svg":..,"x":..,"y":..,"w":..,"h":..}`.
+    /// 호스트가 끌어 옮기거나 크기 · 각도를 바꾸는 동안 틀 안에 그 도형 자기 그림을 보인다(쪽 캔버스를 잘라 쓰지 않는다).
+    pub fn lily_shape_svg_native(
+        &self,
+        page: u32,
+        sec: usize,
+        para: usize,
+        ci: usize,
+    ) -> Result<String, HwpError> {
+        use crate::renderer::render_tree::{RenderNode, RenderNodeType};
+        fn ids(n: &RenderNode) -> Option<(Option<usize>, Option<usize>, Option<usize>)> {
+            match &n.node_type {
+                RenderNodeType::Rectangle(r) => {
+                    Some((r.section_index, r.para_index, r.control_index))
+                }
+                RenderNodeType::Ellipse(e) => {
+                    Some((e.section_index, e.para_index, e.control_index))
+                }
+                RenderNodeType::Path(p) => Some((p.section_index, p.para_index, p.control_index)),
+                RenderNodeType::Line(l) => Some((l.section_index, l.para_index, l.control_index)),
+                RenderNodeType::Group(g) => Some((g.section_index, g.para_index, g.control_index)),
+                _ => None,
+            }
+        }
+        fn find(n: &RenderNode, want: (usize, usize, usize)) -> Option<RenderNode> {
+            if ids(n) == Some((Some(want.0), Some(want.1), Some(want.2))) {
+                return Some(n.clone());
+            }
+            n.children.iter().find_map(|c| find(c, want))
+        }
+        let mut tree = self.build_page_tree(page)?;
+        let _ = self.layout_engine.take_overflows();
+        let Some(mut node) = find(&tree.root, (sec, para, ci)) else {
+            return Ok("{\"ok\":false}".to_string());
+        };
+        crate::renderer::layout::lily_shape_text::unrotate_shape(&mut node);
+        let b = node.bbox;
+        tree.root.children = vec![node];
+        let mut renderer = crate::renderer::svg::SvgRenderer::new();
+        renderer.render_tree(&tree);
+        let svg = renderer.output().to_string();
+        Ok(serde_json::json!({ "ok": true, "svg": svg, "x": b.x, "y": b.y, "w": b.width, "h": b.height }).to_string())
+    }
 }
 
 // 시험: LilyOffice crates/lilyoffice-wasm/src/rhwp_ext.rs `shape_style_and_text_survive_save`(HWP · HWPX 저장 왕복).

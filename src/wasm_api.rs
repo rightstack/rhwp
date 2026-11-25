@@ -5321,6 +5321,24 @@ impl HwpDocument {
         .map_err(|e| e.into())
     }
 
+    /// [lily] 도형 하나만 그린 SVG(돌리기 전) + 쪽 px 상자.
+    #[wasm_bindgen(js_name = lilyShapeSvg)]
+    pub fn lily_shape_svg_api(
+        &self,
+        page: u32,
+        section_idx: u32,
+        para_idx: u32,
+        control_idx: u32,
+    ) -> Result<String, JsValue> {
+        self.lily_shape_svg_native(
+            page,
+            section_idx as usize,
+            para_idx as usize,
+            control_idx as usize,
+        )
+        .map_err(|e| e.into())
+    }
+
     /// [lily] 사각형 · 타원 · 닫힌 다각형 · 곡선에 빈 도형 글 영역을 만든다.
     #[wasm_bindgen(js_name = lilyEnsureShapeText)]
     pub fn lily_ensure_shape_text_api(

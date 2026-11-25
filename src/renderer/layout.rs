@@ -3669,6 +3669,8 @@ pub struct LayoutEngine {
 mod anchor_box_flow;
 mod border_rendering;
 mod fixed_textbox_flow;
+/// [lily] 돌린 도형의 글도 같이 돌린다.
+pub(crate) mod lily_shape_text;
 mod paragraph_layout;
 mod picture_footnote;
 mod shape_layout;

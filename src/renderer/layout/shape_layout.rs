@@ -1524,6 +1524,7 @@ impl LayoutEngine {
                     textbox_vpos_origin_hu(shape.common(), matrix_positioned),
                 );
                 node.set_rectangle_control_kind(rect.control_kind());
+                super::lily_shape_text::rotate_shape_text(&mut node, &transform); // [lily]
                 parent.children.push(node);
             }
             ShapeObject::Line(line) => {
@@ -1843,6 +1844,7 @@ impl LayoutEngine {
                     matrix_positioned,
                     textbox_vpos_origin_hu(shape.common(), matrix_positioned),
                 );
+                super::lily_shape_text::rotate_shape_text(&mut node, &transform); // [lily]
                 parent.children.push(node);
             }
             ShapeObject::Arc(arc) => {
@@ -2030,6 +2032,7 @@ impl LayoutEngine {
                     matrix_positioned,
                     textbox_vpos_origin_hu(shape.common(), matrix_positioned),
                 );
+                super::lily_shape_text::rotate_shape_text(&mut node, &transform); // [lily]
                 parent.children.push(node);
             }
             ShapeObject::Curve(curve) => {
@@ -2097,6 +2100,7 @@ impl LayoutEngine {
                     matrix_positioned,
                     textbox_vpos_origin_hu(shape.common(), matrix_positioned),
                 );
+                super::lily_shape_text::rotate_shape_text(&mut node, &transform); // [lily]
                 parent.children.push(node);
             }
             ShapeObject::Group(group) => {

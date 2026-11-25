@@ -70,7 +70,7 @@ import { insertTableAtCaret } from '@/embed/table-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
 import { deletePictures, insertFloatingPicture, listPictures, pictureImage, selectedPictures, selectPictures, updatePictures } from '@/embed/picture-ops';
-import { createShape, deleteShapes, editShapeText, groupShapes, listShapes, selectedShapes, selectShapes, ungroupShape, updateShapes } from '@/embed/shape-ops';
+import { createShape, deleteShapes, editShapeText, groupShapes, listShapes, selectedShapes, selectShapes, shapeImage, ungroupShape, updateShapes } from '@/embed/shape-ops';
 import { insertFieldAtCaret, listClickHereFields, setFieldValue } from '@/embed/field-ops';
 import { insertTextAt } from '@/embed/text-ops';
 import { MarkdownRules } from '@/embed/markdown-rules';
@@ -2414,6 +2414,11 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return ungroupShape(inputHandler, req);
+    },
+    async shapeImage(req) {
+      await initPromise;
+      if (wasm.pageCount === 0) return null;
+      return shapeImage(wasm, req);
     },
     async shapeSetTyping(req) {
       await initPromise;

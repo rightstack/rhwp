@@ -438,6 +438,7 @@ export declare class RhwpEditor {
     group(req: { items: RhwpPictureRef[] }): Promise<{ ok: boolean; ref?: RhwpPictureRef }>;
     ungroup(ref: RhwpPictureRef): Promise<{ ok: boolean }>;
     setTyping(req: { on: boolean }): Promise<{ ok: boolean }>;
+    image(ref: RhwpPictureRef): Promise<{ data: string } | null>;
   };
   /** [lily] 차트: 그림 + 그림 설명(`lily-chart:` + JSON)에 실은 정의 */
   readonly chart: {
@@ -685,7 +686,7 @@ export interface RhwpShapeInfo extends RhwpPictureRef {
   type: 'shape' | 'line' | 'group'; kind: string; page: number; cxMm: number; cyMm: number; widthMm: number; heightMm: number; rotationDeg: number;
   flipX: boolean; flipY: boolean; x1Mm?: number; y1Mm?: number; x2Mm?: number; y2Mm?: number; locked: boolean; zOrder: number;
   wrap: 'inline' | 'square' | 'topAndBottom' | 'behind' | 'front' | 'tight' | 'through'; closed: boolean; fill: string | null; opacity: number;
-  line: string | null; lineWidthPt: number; shadow: 'none' | 'soft' | 'normal' | 'retro' | 'other'; roundRate: number | null; hasText: boolean; canText: boolean; description: string;
+  line: string | null; lineWidthPt: number; shadow: 'none' | 'soft' | 'normal' | 'retro' | 'other'; roundRate: number | null; hasText: boolean; canText: boolean; description: string; editing?: boolean;
 }
 /** [lily] 도형 고치기 */
 export interface RhwpShapeUpdate extends RhwpPictureRef {

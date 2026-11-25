@@ -161,6 +161,7 @@ export interface EmbedRpcHandlers {
   shapeGroup(req: EmbedShapeRefsV1): Promise<{ ok: boolean; ref?: EmbedShapeRefV1 }>;
   shapeUngroup(req: EmbedShapeRefV1): Promise<{ ok: boolean }>;
   shapeSetTyping(req: { on: boolean }): Promise<{ ok: boolean }>;
+  shapeImage(req: EmbedShapeRefV1): Promise<{ data: string } | null>;
   chartInsert(req: EmbedChartInsertV1): Promise<EmbedPageOpResultV1>;
   chartSelected(): Promise<EmbedChartSelectedV1 | null>;
   chartReplace(req: EmbedChartReplaceV1): Promise<EmbedPageOpResultV1>;
@@ -477,6 +478,9 @@ export async function routeEmbedRequest(
     case 'shape.ungroup':
       assertOnlyKeys(params, ['sec', 'para', 'ci'], 'shape.ungroup params');
       return handlers.shapeUngroup(parseShapeRef(params));
+    case 'shape.image':
+      assertOnlyKeys(params, ['sec', 'para', 'ci'], 'shape.image params');
+      return handlers.shapeImage(parseShapeRef(params));
     case 'shape.setTyping':
       assertOnlyKeys(params, ['on'], 'shape.setTyping params');
       return handlers.shapeSetTyping(parseShapeTyping(params));

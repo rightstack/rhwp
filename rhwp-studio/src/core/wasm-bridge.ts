@@ -2564,6 +2564,12 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).lilyShapeStyleGet(sec, para, ci));
   }
 
+  /** [lily] 도형 하나만 그린 SVG(돌리기 전) + 쪽 px 상자 */
+  lilyShapeSvg(page: number, sec: number, para: number, ci: number): { ok: boolean; svg?: string; x?: number; y?: number; w?: number; h?: number } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).lilyShapeSvg(page, sec, para, ci));
+  }
+
   /** [lily] 사각형 · 타원 · 닫힌 다각형에 빈 도형 글 영역 */
   lilyEnsureShapeText(sec: number, para: number, ci: number): { ok: boolean; created: boolean } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
