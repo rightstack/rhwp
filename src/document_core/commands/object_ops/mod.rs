@@ -10,6 +10,8 @@ mod connector;
 mod equation;
 /// [lily] 임베드 호스트 도형 패널 — 꾸밈 읽기·쓰기(묶음 포함) · 도형 글 만들기.
 mod lily_shape;
+/// [lily] 임베드 호스트 색 메뉴 테마 고르기 — 테마 이름 책갈피 · 테마 색 옮기기.
+mod lily_theme;
 mod note;
 mod picture;
 mod shape;

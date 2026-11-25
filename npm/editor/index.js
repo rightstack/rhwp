@@ -626,6 +626,14 @@ export class RhwpEditor {
     };
   }
 
+  /** [lily] 문서 테마(색 메뉴 테마 고르기) — 이름 = 책갈피 `_lily_theme_<name>` */
+  get theme() {
+    return {
+      get: () => this._request('theme.get'),
+      set: (name, map) => this._request('theme.set', { name, map }),
+    };
+  }
+
   /** 코드 블록('코드' 스타일 문단 묶음, 언어 = 책갈피 `_lily_code_<lang>_<n>`) */
   get code() {
     return {

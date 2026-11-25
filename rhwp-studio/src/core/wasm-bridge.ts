@@ -2552,6 +2552,18 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).groupShapes(json));
   }
 
+  /** [lily] 문서 테마 이름(책갈피 `_lily_theme_<name>`) */
+  lilyThemeGet(): { name: string | null } {
+    if (!this.doc) return { name: null };
+    return JSON.parse((this.doc as any).lilyThemeGet());
+  }
+
+  /** [lily] 문서 테마 바꾸기: 테마 책갈피 + 박힌 색 옮기기 */
+  lilyThemeSet(name: string, map: Record<string, string>): { ok: boolean; remapped?: number } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).lilyThemeSet(name, JSON.stringify(map)));
+  }
+
   /** [lily] 도형 꾸밈(채우기 · 선 · 그림자) — 묶음이면 안의 개체 모두 */
   lilyShapeStyle(sec: number, para: number, ci: number, props: Record<string, unknown>): { ok: boolean } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');

@@ -1,5 +1,6 @@
 import type { HmlSaveState } from '../core/hml-save-capability.ts';
 import type { EmbedFontDecisionTraceV1 } from '../core/font-decision-trace.ts';
+import { parseThemeSet, type EmbedThemeSetV1 } from './theme-ops.ts';
 import {
   assertEmptyParams,
   assertOnlyParam,
@@ -150,6 +151,9 @@ export interface EmbedRpcHandlers {
   pictureUpdate(req: EmbedPictureUpdateV1): Promise<{ ok: boolean }>;
   pictureDelete(req: EmbedPictureRefsV1): Promise<{ ok: boolean }>;
   pictureImage(req: EmbedPictureRefV1): Promise<{ data: string } | null>;
+  /** [lily] 문서 테마(색 메뉴 테마 고르기): 이름 읽기 · 바꾸기(테마 책갈피 + 박힌 색 옮기기, 한 단계) */
+  themeGet(): Promise<{ name: string | null }>;
+  themeSet(req: EmbedThemeSetV1): Promise<{ ok: boolean; remapped?: number }>;
   /** [lily] 본문 도형: 넣기 · 목록 · 고른 것 · 고르기 · 고치기 · 지우기 · 도형 글 · 묶기 · 풀기 · 고른 채 치기 */
   shapeCreate(req: EmbedShapeCreateV1): Promise<{ ok: boolean; ref?: EmbedShapeRefV1 }>;
   shapeList(): Promise<{ pages: { widthMm: number; heightMm: number }[]; items: EmbedShapeInfoV1[] }>;
@@ -453,6 +457,12 @@ export async function routeEmbedRequest(
     case 'picture.image':
       assertOnlyKeys(params, ['sec', 'para', 'ci'], 'picture.image params');
       return handlers.pictureImage(parsePictureImage(params));
+    case 'theme.get':
+      assertOnlyKeys(params, [], 'theme.get params');
+      return handlers.themeGet();
+    case 'theme.set':
+      assertOnlyKeys(params, ['name', 'map'], 'theme.set params');
+      return handlers.themeSet(parseThemeSet(params));
     case 'shape.create':
       assertOnlyKeys(params, ['page', 'xMm', 'yMm', 'widthMm', 'heightMm', 'kind', 'roundRate', 'paths', 'flipX', 'flipY', 'arrow', 'fill', 'line', 'lineWidthPt', 'description'], 'shape.create params');
       return handlers.shapeCreate(parseShapeCreate(params));

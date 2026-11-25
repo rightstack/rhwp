@@ -481,6 +481,13 @@ export declare class RhwpEditor {
     setRules(enabled: boolean): Promise<{ ok: boolean }>;
   };
 
+  /** [lily] 문서 테마(색 메뉴 테마 고르기) — 이름 = 본문 책갈피 `_lily_theme_<name>`(hwp·hwpx 저장에 남는다) */
+  readonly theme: {
+    get(): Promise<{ name: string | null }>;
+    /** 테마 책갈피 + 박힌 색 옮기기(map = 옛 테마 칸 → 새 테마 칸, "RRGGBB"). 실행 취소 한 단계 */
+    set(name: string, map: Record<string, string>): Promise<{ ok: boolean; remapped?: number }>;
+  };
+
   /** 코드 블록 — 연속한 '코드' 스타일 본문 문단, 언어 = 책갈피 `_lily_code_<lang>_<n>` */
   readonly code: {
     blocks(): Promise<Array<{ section: number; paragraph: number; count: number; lang: string; lines: string[] }>>;

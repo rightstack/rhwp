@@ -5287,6 +5287,18 @@ impl HwpDocument {
         .map_err(|e| e.into())
     }
 
+    /// [lily] 문서 테마 이름(책갈피 `_lily_theme_<name>`): `{"name": string|null}`.
+    #[wasm_bindgen(js_name = lilyThemeGet)]
+    pub fn lily_theme_get_api(&self) -> String {
+        self.lily_theme_get_native()
+    }
+
+    /// [lily] 문서 테마 바꾸기: 테마 책갈피 + 박힌 색 옮기기(`map_json` = {"RRGGBB": "RRGGBB"}).
+    #[wasm_bindgen(js_name = lilyThemeSet)]
+    pub fn lily_theme_set_api(&mut self, name: &str, map_json: &str) -> Result<String, JsValue> {
+        self.lily_theme_set_native(name, map_json).map_err(|e| e.into())
+    }
+
     /// [lily] 도형 꾸밈(채우기 · 선 · 그림자, 묶음이면 안의 개체 모두)을 바꾼다.
     #[wasm_bindgen(js_name = lilyShapeStyle)]
     pub fn lily_shape_style_api(
