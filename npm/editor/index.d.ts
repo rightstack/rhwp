@@ -426,6 +426,19 @@ export declare class RhwpEditor {
     delete(req: { items: RhwpPictureRef[] }): Promise<{ ok: boolean }>;
     image(ref: RhwpPictureRef): Promise<{ data: string } | null>;
   };
+  /** [lily] 본문 도형(글 앞으로 떠 있게 넣기 · 목록 · 고르기 · 고치기 · 지우기 · 도형 글 · 묶기) */
+  readonly shapes: {
+    create(req: RhwpShapeCreate): Promise<{ ok: boolean; ref?: RhwpPictureRef }>;
+    list(): Promise<{ pages: { widthMm: number; heightMm: number }[]; items: RhwpShapeInfo[] }>;
+    selected(): Promise<{ items: RhwpShapeInfo[] }>;
+    select(req: { items: RhwpPictureRef[] }): Promise<{ ok: boolean }>;
+    update(req: { items: RhwpShapeUpdate[]; select?: boolean }): Promise<{ ok: boolean }>;
+    delete(req: { items: RhwpPictureRef[] }): Promise<{ ok: boolean }>;
+    editText(ref: RhwpPictureRef): Promise<{ ok: boolean }>;
+    group(req: { items: RhwpPictureRef[] }): Promise<{ ok: boolean; ref?: RhwpPictureRef }>;
+    ungroup(ref: RhwpPictureRef): Promise<{ ok: boolean }>;
+    setTyping(req: { on: boolean }): Promise<{ ok: boolean }>;
+  };
   /** [lily] 차트: 그림 + 그림 설명(`lily-chart:` + JSON)에 실은 정의 */
   readonly chart: {
     insert(req: { png: string; widthMm: number; heightMm: number; description: string }): Promise<{ ok: boolean }>;
@@ -659,3 +672,24 @@ export interface RhwpPictureRef { sec: number; para: number; ci: number }
 export interface RhwpPictureInfo extends RhwpPictureRef { page: number; cxMm: number; cyMm: number; widthMm: number; heightMm: number; rotationDeg: number; description: string; locked: boolean; zOrder: number }
 /** [lily] 그림 고치기: 그림(png) · 돌리기 전 크기(가운데 유지) · 옮기기 · 각도 · 설명 · 잠금 · 맨 앞/맨 뒤 */
 export interface RhwpPictureUpdate extends RhwpPictureRef { png?: string; widthMm?: number; heightMm?: number; dxMm?: number; dyMm?: number; rotationDeg?: number; description?: string; locked?: boolean; order?: 'front' | 'back' }
+
+/** [lily] 도형 넣기 */
+export interface RhwpShapeCreate {
+  page: number; xMm: number; yMm: number; widthMm: number; heightMm: number;
+  kind: 'rectangle' | 'ellipse' | 'line' | 'arc' | 'polygon' | 'textbox' | 'connector-straight' | 'connector-stroke' | 'connector-arc';
+  roundRate?: number; paths?: { pts: [number, number][]; closed: boolean }[]; flipX?: boolean; flipY?: boolean; arrow?: 'end' | 'both';
+  fill?: string | null; line?: string | null; lineWidthPt?: number; description?: string;
+}
+/** [lily] 본문 도형 하나 */
+export interface RhwpShapeInfo extends RhwpPictureRef {
+  type: 'shape' | 'line' | 'group'; kind: string; page: number; cxMm: number; cyMm: number; widthMm: number; heightMm: number; rotationDeg: number;
+  flipX: boolean; flipY: boolean; x1Mm?: number; y1Mm?: number; x2Mm?: number; y2Mm?: number; locked: boolean; zOrder: number;
+  wrap: 'inline' | 'square' | 'topAndBottom' | 'behind' | 'front' | 'tight' | 'through'; closed: boolean; fill: string | null; opacity: number;
+  line: string | null; lineWidthPt: number; shadow: 'none' | 'soft' | 'normal' | 'retro' | 'other'; roundRate: number | null; hasText: boolean; canText: boolean; description: string;
+}
+/** [lily] 도형 고치기 */
+export interface RhwpShapeUpdate extends RhwpPictureRef {
+  widthMm?: number; heightMm?: number; dxMm?: number; dyMm?: number; rotationDeg?: number; flipX?: boolean; flipY?: boolean;
+  fill?: string | null; opacity?: number; line?: string | null; lineWidthPt?: number; shadow?: 'none' | 'soft' | 'normal' | 'retro';
+  roundRate?: number; wrap?: 'inline' | 'square' | 'topAndBottom' | 'behind' | 'front'; locked?: boolean; order?: 'front' | 'back' | 'forward' | 'backward'; description?: string;
+}

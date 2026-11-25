@@ -567,6 +567,26 @@ export class RhwpEditor {
     };
   }
 
+  /**
+   * [lily] 본문 도형 — `create({ page, xMm, yMm, widthMm, heightMm, kind, roundRate?, paths?, flipX?, flipY?, arrow?, fill?, line?, lineWidthPt?, description? })`
+   * (글 앞으로 떠 있게 넣고 고른다) · `list()` · `selected()` · `select({ items })` · `update({ items, select? })` · `delete({ items })` ·
+   * `editText(ref)` · `group({ items })` · `ungroup(ref)` · `setTyping({ on })`(고른 채 치는 글자 = 도형 글). 바꿈은 실행 취소 한 단계.
+   */
+  get shapes() {
+    return {
+      create: (req) => this._request('shape.create', req),
+      list: () => this._request('shape.list', {}),
+      selected: () => this._request('shape.selected', {}),
+      select: (req) => this._request('shape.select', req),
+      update: (req) => this._request('shape.update', req),
+      delete: (req) => this._request('shape.delete', req),
+      editText: (ref) => this._request('shape.editText', ref),
+      group: (req) => this._request('shape.group', req),
+      ungroup: (ref) => this._request('shape.ungroup', ref),
+      setTyping: (req) => this._request('shape.setTyping', req),
+    };
+  }
+
   get chart() {
     return {
       insert: (req) => this._request('chart.insert', req),

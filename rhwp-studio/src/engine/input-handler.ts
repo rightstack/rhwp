@@ -4822,14 +4822,14 @@ export class InputHandler {
   }
 
   /** [lily] embed picture.select: 본문 그림 여럿을 개체 선택한다(하나면 단일 선택, 빈 목록이면 선택 해제) */
-  lilySelectObjects(refs: { sec: number; ppi: number; ci: number }[]): void {
+  lilySelectObjects(refs: { sec: number; ppi: number; ci: number; type?: 'image' | 'shape' | 'group' | 'line' }[]): void {
     if (refs.length === 0) {
       if (this.cursor.isInPictureObjectSelection()) this.exitPictureObjectSelectionIfNeeded();
       return;
     }
     this.cursor.clearSelection();
-    this.cursor.enterPictureObjectSelectionDirect(refs[0].sec, refs[0].ppi, refs[0].ci, 'image');
-    for (const r of refs.slice(1)) this.cursor.togglePictureObjectSelection(r.sec, r.ppi, r.ci, 'image');
+    this.cursor.enterPictureObjectSelectionDirect(refs[0].sec, refs[0].ppi, refs[0].ci, refs[0].type ?? 'image');
+    for (const r of refs.slice(1)) this.cursor.togglePictureObjectSelection(r.sec, r.ppi, r.ci, r.type ?? 'image');
     this.active = true;
     this.caret.hide();
     this.selectionRenderer.clear();
@@ -4865,6 +4865,60 @@ export class InputHandler {
   exitPictureObjectSelectionAndAfterEdit(): void {
     this.exitPictureObjectSelectionIfNeeded();
     this.afterEdit();
+  }
+
+  /** [lily] embed `shape.setTyping`: 도형 하나를 고른 채 글자를 치면 도형 글로(PowerPoint · Word 와 같다). 기본 꺼짐 = upstream 동작 */
+  lilyShapeTyping = false;
+
+  /**
+   * [lily] 본문 도형의 글 편집에 들어간다: 글 영역이 없으면 만들고(사각형 · 타원 · 닫힌 다각형, 실행 취소 한 단계 —
+   * 새로 만든 글은 세로 가운데 · 가운데 맞춤, Rust lilyEnsureShapeText), 캐럿을 글 끝에. 글을 담지 못하는 도형(선 · 호 · 열린 꼴 · 묶음)이면 false
+   */
+  lilyEditShapeText(sec: number, ppi: number, ci: number): boolean {
+    const w = this.wasm;
+    let info: Record<string, unknown>;
+    try { info = w.lilyShapeStyleGet(sec, ppi, ci); } catch { return false; }
+    if (!info.canText) return false;
+    if (!info.hasText) {
+      this.executeOperation({
+        kind: 'snapshot',
+        operationType: 'lilyShapeText',
+        operation: (wasm) => {
+          wasm.lilyEnsureShapeText(sec, ppi, ci);
+          return this.cursor.getPosition();
+        },
+      });
+    }
+    if (this.cursor.isInPictureObjectSelection()) {
+      this.cursor.exitPictureObjectSelection();
+      this.pictureObjectRenderer?.clear();
+      this.eventBus.emit('picture-object-selection-changed', false);
+    }
+    let end = 0;
+    try {
+      const t = w.getShapeText(sec, ppi, ci);
+      if (t.ok && !t.text.includes('\n')) end = t.text.length;
+    } catch { /* 처음 */ }
+    this.active = true;
+    this.enterInlineEditing(sec, ppi, ci, end);
+    return true;
+  }
+
+  /**
+   * [lily] 키 하나가 고른 도형의 글이 되는가(onKeyDown 맨 앞, IME 조합 시작 229 포함). 'text' = 글 편집에 들어갔다(키는 그대로 간다),
+   * 'swallow' = 글을 담지 못하는 도형이라 키를 삼킨다, null = 해당 없음
+   */
+  lilyShapeKey(e: KeyboardEvent): 'text' | 'swallow' | null {
+    if (!this.lilyShapeTyping || !this.cursor.isInPictureObjectSelection()) return null;
+    if (e.ctrlKey || e.metaKey || e.altKey) return null;
+    const typing = e.keyCode === 229 || e.key === 'Process' || e.key.length === 1;
+    if (!typing) return null;
+    const refs = this.cursor.getSelectedPictureRefs() as { sec: number; ppi: number; ci: number; type: string; cellPath?: unknown[]; headerFooter?: unknown; noteRef?: unknown; cellIdx?: number }[];
+    const shapes = refs.filter((r) => (r.type === 'shape' || r.type === 'line' || r.type === 'group') && !r.cellPath?.length && r.cellIdx === undefined && !r.headerFooter && !r.noteRef);
+    if (!shapes.length || shapes.length !== refs.length) return null;
+    if (shapes.length > 1) return 'swallow';
+    const r = shapes[0];
+    return this.lilyEditShapeText(r.sec, r.ppi, r.ci) ? 'text' : 'swallow';
   }
 
   /** 글상자 내부 텍스트 편집 모드 진입 */

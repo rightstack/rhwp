@@ -182,7 +182,7 @@ const signed = (v: number) => (v > 0x7fffffff ? v - 0x100000000 : v);
 type Pos = { sectionIndex: number; paragraphIndex: number; charOffset: number };
 
 /** 쪽 위 점(mm) 아래의 본문 글 자리. 표 칸 · 글상자 위면 글 영역 왼쪽 위의 본문 자리 */
-function anchorOnPage(wasm: WasmBridge, page: number, xMm: number, yMm: number): Pos | null {
+export function anchorOnPage(wasm: WasmBridge, page: number, xMm: number, yMm: number): Pos | null {
   const body = (h: ReturnType<WasmBridge['hitTest']> | null): Pos | null =>
     h && h.parentParaIndex === undefined && !h.cellPath?.length && !h.isTextBox ? { sectionIndex: h.sectionIndex, paragraphIndex: h.paragraphIndex, charOffset: h.charOffset } : null;
   const hit = (x: number, y: number) => { try { return wasm.hitTest(page, x, y); } catch { return null; } };

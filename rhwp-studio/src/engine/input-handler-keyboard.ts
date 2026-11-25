@@ -799,6 +799,12 @@ export function onKeyDown(this: any, e: KeyboardEvent): void {
   if (dispatchCellBlockCtrlShiftS.call(this, e)) return;
   if (dispatchCellBlockLetterShortcut.call(this, e)) return;
 
+  // [lily] 도형을 고른 채 치는 글자 = 도형 글(embed shape.setTyping 으로 켰을 때만)
+  {
+    const lily = this.lilyShapeKey?.(e);
+    if (lily === 'swallow') { e.preventDefault(); return; }
+  }
+
   // IME 조합 중 처리 (한국어 IME에서 e.key는 항상 'Process'이므로 e.code로 판별)
   if (e.isComposing || e.keyCode === 229) {
     // [PR #786 후속] Ctrl+M chord 1번째/2번째 키 영역 영역 IME 합성 중 영역 영역도 활성화.

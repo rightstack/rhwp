@@ -8,6 +8,8 @@ mod chart;
 mod common;
 mod connector;
 mod equation;
+/// [lily] 임베드 호스트 도형 패널 — 꾸밈 읽기·쓰기(묶음 포함) · 도형 글 만들기.
+mod lily_shape;
 mod note;
 mod picture;
 mod shape;

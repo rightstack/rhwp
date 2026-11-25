@@ -5287,6 +5287,56 @@ impl HwpDocument {
         .map_err(|e| e.into())
     }
 
+    /// [lily] 도형 꾸밈(채우기 · 선 · 그림자, 묶음이면 안의 개체 모두)을 바꾼다.
+    #[wasm_bindgen(js_name = lilyShapeStyle)]
+    pub fn lily_shape_style_api(
+        &mut self,
+        section_idx: u32,
+        para_idx: u32,
+        control_idx: u32,
+        props_json: &str,
+    ) -> Result<String, JsValue> {
+        self.lily_shape_style_native(
+            section_idx as usize,
+            para_idx as usize,
+            control_idx as usize,
+            props_json,
+        )
+        .map_err(|e| e.into())
+    }
+
+    /// [lily] 도형 종류 · 닫힘 · 글 있음 · 꾸밈(묶음이면 첫 닫힌 자식).
+    #[wasm_bindgen(js_name = lilyShapeStyleGet)]
+    pub fn lily_shape_style_get_api(
+        &self,
+        section_idx: u32,
+        para_idx: u32,
+        control_idx: u32,
+    ) -> Result<String, JsValue> {
+        self.lily_shape_style_get_native(
+            section_idx as usize,
+            para_idx as usize,
+            control_idx as usize,
+        )
+        .map_err(|e| e.into())
+    }
+
+    /// [lily] 사각형 · 타원 · 닫힌 다각형 · 곡선에 빈 도형 글 영역을 만든다.
+    #[wasm_bindgen(js_name = lilyEnsureShapeText)]
+    pub fn lily_ensure_shape_text_api(
+        &mut self,
+        section_idx: u32,
+        para_idx: u32,
+        control_idx: u32,
+    ) -> Result<String, JsValue> {
+        self.lily_ensure_shape_text_native(
+            section_idx as usize,
+            para_idx as usize,
+            control_idx as usize,
+        )
+        .map_err(|e| e.into())
+    }
+
     /// [lily] 메모 번호로 메모 글을 바꾼다. 못 찾으면 false.
     #[wasm_bindgen(js_name = setMemoText)]
     pub fn set_memo_text_api(&mut self, memo_index: u32, text: &str) -> Result<bool, JsValue> {

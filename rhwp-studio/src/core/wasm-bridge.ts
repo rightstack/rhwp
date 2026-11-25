@@ -2552,6 +2552,24 @@ export class WasmBridge {
     return JSON.parse((this.doc as any).groupShapes(json));
   }
 
+  /** [lily] 도형 꾸밈(채우기 · 선 · 그림자) — 묶음이면 안의 개체 모두 */
+  lilyShapeStyle(sec: number, para: number, ci: number, props: Record<string, unknown>): { ok: boolean } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).lilyShapeStyle(sec, para, ci, JSON.stringify(props)));
+  }
+
+  /** [lily] 도형 종류 · 닫힘 · 글 있음 · 꾸밈 */
+  lilyShapeStyleGet(sec: number, para: number, ci: number): Record<string, unknown> {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).lilyShapeStyleGet(sec, para, ci));
+  }
+
+  /** [lily] 사각형 · 타원 · 닫힌 다각형에 빈 도형 글 영역 */
+  lilyEnsureShapeText(sec: number, para: number, ci: number): { ok: boolean; created: boolean } {
+    if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
+    return JSON.parse((this.doc as any).lilyEnsureShapeText(sec, para, ci));
+  }
+
   insertEquation(sec: number, para: number, charOffset: number, script: string, fontSizeHwpunit: number, color: number): { ok: boolean; paraIdx: number; controlIdx: number } {
     if (!this.doc) throw new Error('문서가 로드되지 않았습니다');
     return JSON.parse((this.doc as any).insertEquation(sec, para, charOffset, script, fontSizeHwpunit, color));

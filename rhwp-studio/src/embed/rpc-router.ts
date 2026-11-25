@@ -31,6 +31,10 @@ import {
   parsePictureImage, parsePictureInsert, parsePictureList, parsePictureRefs, parsePictureUpdate,
   type EmbedPictureInfoV1, type EmbedPictureInsertResultV1, type EmbedPictureInsertV1, type EmbedPictureListV1, type EmbedPictureRefsV1, type EmbedPictureRefV1, type EmbedPictureUpdateV1,
 } from './picture-ops.ts';
+import {
+  parseShapeCreate, parseShapeRef, parseShapeRefs, parseShapeTyping, parseShapeUpdate,
+  type EmbedShapeCreateV1, type EmbedShapeInfoV1, type EmbedShapeRefV1, type EmbedShapeRefsV1, type EmbedShapeUpdateV1,
+} from './shape-ops.ts';
 import { parsePageFill, parseShapeInsert, type EmbedPageFillV1, type EmbedPageOpResultV1, type EmbedShapeInsertV1 } from './page-ops.ts';
 import { parseTextInsert, type EmbedTextInsertResultV1, type EmbedTextInsertV1 } from './text-ops.ts';
 import { parseMarkdownRules } from './markdown-rules.ts';
@@ -146,6 +150,17 @@ export interface EmbedRpcHandlers {
   pictureUpdate(req: EmbedPictureUpdateV1): Promise<{ ok: boolean }>;
   pictureDelete(req: EmbedPictureRefsV1): Promise<{ ok: boolean }>;
   pictureImage(req: EmbedPictureRefV1): Promise<{ data: string } | null>;
+  /** [lily] 본문 도형: 넣기 · 목록 · 고른 것 · 고르기 · 고치기 · 지우기 · 도형 글 · 묶기 · 풀기 · 고른 채 치기 */
+  shapeCreate(req: EmbedShapeCreateV1): Promise<{ ok: boolean; ref?: EmbedShapeRefV1 }>;
+  shapeList(): Promise<{ pages: { widthMm: number; heightMm: number }[]; items: EmbedShapeInfoV1[] }>;
+  shapeSelected(): Promise<{ items: EmbedShapeInfoV1[] }>;
+  shapeSelect(req: EmbedShapeRefsV1): Promise<{ ok: boolean }>;
+  shapeUpdate(req: EmbedShapeUpdateV1): Promise<{ ok: boolean }>;
+  shapeDelete(req: EmbedShapeRefsV1): Promise<{ ok: boolean }>;
+  shapeEditText(req: EmbedShapeRefV1): Promise<{ ok: boolean }>;
+  shapeGroup(req: EmbedShapeRefsV1): Promise<{ ok: boolean; ref?: EmbedShapeRefV1 }>;
+  shapeUngroup(req: EmbedShapeRefV1): Promise<{ ok: boolean }>;
+  shapeSetTyping(req: { on: boolean }): Promise<{ ok: boolean }>;
   chartInsert(req: EmbedChartInsertV1): Promise<EmbedPageOpResultV1>;
   chartSelected(): Promise<EmbedChartSelectedV1 | null>;
   chartReplace(req: EmbedChartReplaceV1): Promise<EmbedPageOpResultV1>;
@@ -437,6 +452,34 @@ export async function routeEmbedRequest(
     case 'picture.image':
       assertOnlyKeys(params, ['sec', 'para', 'ci'], 'picture.image params');
       return handlers.pictureImage(parsePictureImage(params));
+    case 'shape.create':
+      assertOnlyKeys(params, ['page', 'xMm', 'yMm', 'widthMm', 'heightMm', 'kind', 'roundRate', 'paths', 'flipX', 'flipY', 'arrow', 'fill', 'line', 'lineWidthPt', 'description'], 'shape.create params');
+      return handlers.shapeCreate(parseShapeCreate(params));
+    case 'shape.list':
+      assertOnlyKeys(params, [], 'shape.list params');
+      return handlers.shapeList();
+    case 'shape.selected': return handlers.shapeSelected();
+    case 'shape.select':
+      assertOnlyKeys(params, ['items'], 'shape.select params');
+      return handlers.shapeSelect(parseShapeRefs(params));
+    case 'shape.update':
+      assertOnlyKeys(params, ['items', 'select'], 'shape.update params');
+      return handlers.shapeUpdate(parseShapeUpdate(params));
+    case 'shape.delete':
+      assertOnlyKeys(params, ['items'], 'shape.delete params');
+      return handlers.shapeDelete(parseShapeRefs(params));
+    case 'shape.editText':
+      assertOnlyKeys(params, ['sec', 'para', 'ci'], 'shape.editText params');
+      return handlers.shapeEditText(parseShapeRef(params));
+    case 'shape.group':
+      assertOnlyKeys(params, ['items'], 'shape.group params');
+      return handlers.shapeGroup(parseShapeRefs(params));
+    case 'shape.ungroup':
+      assertOnlyKeys(params, ['sec', 'para', 'ci'], 'shape.ungroup params');
+      return handlers.shapeUngroup(parseShapeRef(params));
+    case 'shape.setTyping':
+      assertOnlyKeys(params, ['on'], 'shape.setTyping params');
+      return handlers.shapeSetTyping(parseShapeTyping(params));
     case 'chart.insert':
       assertOnlyKeys(params, ['png', 'widthMm', 'heightMm', 'description'], 'chart.insert params');
       return handlers.chartInsert(parseChartInsert(params));

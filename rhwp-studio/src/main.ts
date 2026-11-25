@@ -70,6 +70,7 @@ import { insertTableAtCaret } from '@/embed/table-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
 import { deletePictures, insertFloatingPicture, listPictures, pictureImage, selectedPictures, selectPictures, updatePictures } from '@/embed/picture-ops';
+import { createShape, deleteShapes, editShapeText, groupShapes, listShapes, selectedShapes, selectShapes, ungroupShape, updateShapes } from '@/embed/shape-ops';
 import { insertFieldAtCaret, listClickHereFields, setFieldValue } from '@/embed/field-ops';
 import { insertTextAt } from '@/embed/text-ops';
 import { MarkdownRules } from '@/embed/markdown-rules';
@@ -2368,6 +2369,57 @@ installEmbedRuntime({
       await initPromise;
       if (wasm.pageCount === 0) return null;
       return pictureImage(wasm, req);
+    },
+    async shapeCreate(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return createShape(inputHandler, wasm, req);
+    },
+    async shapeList() {
+      await initPromise;
+      if (wasm.pageCount === 0) return { pages: [], items: [] };
+      return listShapes(wasm);
+    },
+    async shapeSelected() {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { items: [] };
+      return selectedShapes(inputHandler, wasm);
+    },
+    async shapeSelect(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return selectShapes(inputHandler, wasm, req);
+    },
+    async shapeUpdate(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return updateShapes(inputHandler, wasm, req);
+    },
+    async shapeDelete(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return deleteShapes(inputHandler, req);
+    },
+    async shapeEditText(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return editShapeText(inputHandler, req);
+    },
+    async shapeGroup(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return groupShapes(inputHandler, wasm, req);
+    },
+    async shapeUngroup(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return ungroupShape(inputHandler, req);
+    },
+    async shapeSetTyping(req) {
+      await initPromise;
+      if (!inputHandler) return { ok: false };
+      inputHandler.lilyShapeTyping = req.on;
+      return { ok: true };
     },
     async chartInsert(req) {
       await initPromise;
