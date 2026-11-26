@@ -459,6 +459,10 @@ export declare class RhwpEditor {
         vAlign?: 'top' | 'center' | 'bottom'; bold?: boolean; color?: string; sizePt?: number; align?: 'left' | 'center' | 'right' | 'justify';
       }>;
     }): Promise<{ ok: boolean; paragraph?: number; rows?: number; cols?: number }>;
+    /** [lily] 캐럿 칸의 바탕색(#rrggbb, 없으면 null). 표 밖(또는 칸 안의 표)이면 inTable: false */
+    cellFill(): Promise<{ inTable: boolean; color: string | null }>;
+    /** [lily] 셀 블록 선택(없으면 캐럿 칸)의 바탕색 #rrggbb, null = 없앰. 실행 취소 한 단계. 표 밖이면 ok: false */
+    setCellFill(color: string | null): Promise<{ ok: boolean }>;
   };
 
   /** 본문 위치에 글 넣기(`\n` = 문단 나누기, 실행 취소 한 단계). 좌표가 본문 문단 밖이면 ok: false.

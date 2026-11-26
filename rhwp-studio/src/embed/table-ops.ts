@@ -12,6 +12,7 @@
  * 꾸민 표(머리 줄에 색이 있는 표, 양식)를 만들 길이 없었다.
  */
 import type { InputHandler } from '../engine/input-handler.ts';
+import type { WasmBridge } from '../core/wasm-bridge.ts';
 
 export const MAX_TABLE_ROWS = 60;
 export const MAX_TABLE_COLS = 20;
@@ -215,4 +216,81 @@ export function insertTableAtCaret(ih: InputHandler, req: EmbedTableInsertV1): E
   });
   ih.focus();
   return paragraph === undefined ? { ok: false } : { ok: true, paragraph, rows: req.rows, cols: req.cols };
+}
+
+// ── [lily] 칸 바탕색(table.cellFill · table.setCellFill, 2026-11-26) ──
+// 호스트 리본(LilyOffice 에이치독스 표 탭)의 "칸 배경" 색 메뉴 — studio 에서는 표 › 셀 테두리/배경 대화 상자의 배경 탭이 하는 일이다.
+// 대화 상자와 같은 wasm 함수(setCellProperties 의 fillType · fillColor)를 snapshot 하나로 부른다(실행 취소 한 단계, dirty 가 따라온다).
+// 대상 = 셀 블록 선택(F5 · 끌기)이면 그 범위에 걸친 칸, 아니면 캐럿이 있는 칸. 중첩 표(칸 안의 표)는 다루지 않는다(ok: false).
+
+export interface EmbedCellFillV1 {
+  /** 바탕색 #rrggbb. null 이면 바탕색을 없앤다 */
+  color: string | null;
+}
+
+export interface EmbedCellFillStateV1 {
+  /** 캐럿이 (맨 바깥) 표 칸 안인가 */
+  inTable: boolean;
+  /** 캐럿 칸의 바탕색 #rrggbb, 없으면 null */
+  color: string | null;
+}
+
+const CELL_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export function parseCellFill(value: Record<string, unknown>): EmbedCellFillV1 {
+  if (value.color !== null && (typeof value.color !== 'string' || !CELL_COLOR.test(value.color))) throw new Error('color must be #rrggbb or null');
+  return { color: value.color === null ? null : (value.color as string).toLowerCase() };
+}
+
+type CellTarget = { sec: number; ppi: number; ci: number; cell: number };
+
+/** 캐럿 칸(맨 바깥 표). 표 밖이거나 중첩 표면 null */
+function caretCell(ih: InputHandler): CellTarget | null {
+  const pos = ih.getCursorPosition();
+  if (pos.parentParaIndex === undefined || pos.controlIndex === undefined || pos.cellIndex === undefined) return null;
+  if (pos.cellPath && pos.cellPath.length > 1) return null;
+  return { sec: pos.sectionIndex, ppi: pos.parentParaIndex, ci: pos.controlIndex, cell: pos.cellIndex };
+}
+
+/** 캐럿 칸의 바탕색(읽기만) */
+export function cellFillState(ih: InputHandler, wasm: WasmBridge): EmbedCellFillStateV1 {
+  const at = caretCell(ih);
+  if (!at) return { inTable: false, color: null };
+  try {
+    const p = wasm.getCellProperties(at.sec, at.ppi, at.ci, at.cell);
+    const color = p.fillType === 'solid' && typeof p.fillColor === 'string' && CELL_COLOR.test(p.fillColor) ? p.fillColor.toLowerCase() : null;
+    return { inTable: true, color };
+  } catch {
+    return { inTable: true, color: null };
+  }
+}
+
+/** 셀 블록(또는 캐럿 칸)의 바탕색을 바꾼다 — 실행 취소 한 단계 */
+export function setCellFill(ih: InputHandler, req: EmbedCellFillV1): { ok: boolean } {
+  const at = caretCell(ih);
+  if (!at) return { ok: false };
+  const range = ih.isInCellSelectionMode() ? ih.getSelectedCellRange() : null;
+  let ok = false;
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: 'cellBorderFill',
+    operation: (wasm) => {
+      let cells = [at.cell];
+      if (range) {
+        const hit = wasm.getTableCellBboxes(at.sec, at.ppi, at.ci).filter((b) => {
+          const endRow = b.row + Math.max(1, b.rowSpan) - 1;
+          const endCol = b.col + Math.max(1, b.colSpan) - 1;
+          return b.row <= range.endRow && endRow >= range.startRow && b.col <= range.endCol && endCol >= range.startCol;
+        }).map((b) => b.cellIdx);
+        if (hit.length) cells = [...new Set(hit)];
+      }
+      const props = req.color ? { fillType: 'solid', fillColor: req.color } : { fillType: 'none' };
+      wasm.runInBatch(() => {
+        for (const cell of cells) wasm.setCellProperties(at.sec, at.ppi, at.ci, cell, props);
+      });
+      ok = true;
+      return ih.getCursorPosition();
+    },
+  });
+  return { ok };
 }

@@ -26,7 +26,7 @@ import {
 } from './format-bridge.ts';
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
 import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
-import { parseTableInsert, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
+import { parseCellFill, parseTableInsert, type EmbedCellFillStateV1, type EmbedCellFillV1, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
 import { parseChartInsert, parseChartReplace, type EmbedChartInsertV1, type EmbedChartReplaceV1, type EmbedChartSelectedV1 } from './chart-ops.ts';
 import {
   parsePictureImage, parsePictureInsert, parsePictureList, parsePictureRefs, parsePictureUpdate,
@@ -141,6 +141,9 @@ export interface EmbedRpcHandlers {
   tableInsert(req: EmbedTableInsertV1): Promise<EmbedTableInsertResultV1>;
   /** [lily] 쪽 바탕색 · 꾸밈 도형 */
   pageSetFill(req: EmbedPageFillV1): Promise<EmbedPageOpResultV1>;
+  /** [lily] 캐럿 칸 바탕색 읽기 · 셀 블록(없으면 캐럿 칸) 바탕색 바꾸기(실행 취소 한 단계) */
+  tableCellFill(): Promise<EmbedCellFillStateV1>;
+  tableSetCellFill(req: EmbedCellFillV1): Promise<{ ok: boolean }>;
   shapeInsert(req: EmbedShapeInsertV1): Promise<EmbedPageOpResultV1>;
   /** [lily] 차트(그림 + 설명에 실은 정의) 넣기 · 고른 차트 읽기 · 바꾸기 */
   pictureInsert(req: EmbedPictureInsertV1): Promise<EmbedPictureInsertResultV1>;
@@ -432,6 +435,12 @@ export async function routeEmbedRequest(
     case 'table.insert':
       assertOnlyKeys(params, ['rows', 'cols', 'cells', 'widthsMm', 'heightsMm', 'format'], 'table.insert params');
       return handlers.tableInsert(parseTableInsert(params));
+    case 'table.cellFill':
+      assertOnlyKeys(params, [], 'table.cellFill params');
+      return handlers.tableCellFill();
+    case 'table.setCellFill':
+      assertOnlyKeys(params, ['color'], 'table.setCellFill params');
+      return handlers.tableSetCellFill(parseCellFill(params));
     case 'page.setFill':
       assertOnlyKeys(params, ['color'], 'page.setFill params');
       return handlers.pageSetFill(parsePageFill(params));

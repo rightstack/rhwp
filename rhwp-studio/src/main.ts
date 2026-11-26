@@ -66,7 +66,7 @@ import { analyzeDocumentFonts } from '@/core/document-font-status';
 import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
 import { charMods, embedFormatState, embedStyleList, paraMods } from '@/embed/format-bridge';
 import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
-import { insertTableAtCaret } from '@/embed/table-ops';
+import { cellFillState, insertTableAtCaret, setCellFill } from '@/embed/table-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
 import { deletePictures, insertFloatingPicture, listPictures, pictureImage, selectedPictures, selectPictures, updatePictures } from '@/embed/picture-ops';
@@ -2325,6 +2325,16 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return insertTableAtCaret(inputHandler, req);
+    },
+    async tableCellFill() {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { inTable: false, color: null };
+      return cellFillState(inputHandler, wasm);
+    },
+    async tableSetCellFill(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return setCellFill(inputHandler, req);
     },
     async pageSetFill(req) {
       await initPromise;
