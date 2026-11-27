@@ -448,7 +448,7 @@ export async function routeEmbedRequest(
       assertOnlyKeys(params, ['fieldId', 'name', 'occurrence', 'value'], 'field.set params');
       return handlers.fieldSet(parseFieldSet(params));
     case 'table.insert':
-      assertOnlyKeys(params, ['rows', 'cols', 'cells', 'widthsMm', 'heightsMm', 'format', 'cellPaddingMm'], 'table.insert params');
+      assertOnlyKeys(params, ['rows', 'cols', 'cells', 'widthsMm', 'heightsMm', 'format', 'cellPaddingMm', 'headerRow'], 'table.insert params');
       return handlers.tableInsert(parseTableInsert(params));
     case 'table.cellFill':
       assertOnlyKeys(params, [], 'table.cellFill params');

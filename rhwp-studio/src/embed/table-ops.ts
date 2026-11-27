@@ -14,6 +14,9 @@
  * [lily] 칸 안 여백 · 빈 칸 글자(2026-11-27): `cellPaddingMm` = 표 안 여백(표 속성)과 모든 칸의 안 여백(셀 속성)을 같은 값으로 —
  * 호스트가 새 표의 기본 여백을 한컴 기본(위·아래 0.5mm)보다 넉넉하게 준다. 글자 꾸밈(굵기 · 색 · 크기)은 빈 칸에도 준다
  * (빈 문단의 글자 모양 — 나중에 그 칸에 치는 글이 그 모양을 따른다).
+ *
+ * [lily] 제목 줄(2026-11-27): `headerRow: true` = 첫 행 칸을 제목 칸으로 + 표의 제목 줄 자동 반복(표 › 셀 속성 대화 상자의 두 칸,
+ * `table.setHeaderRow` 와 같은 값) — 표 만들기와 같은 snapshot(실행 취소 한 단계).
  */
 import type { InputHandler } from '../engine/input-handler.ts';
 import type { WasmBridge } from '../core/wasm-bridge.ts';
@@ -53,6 +56,8 @@ export interface EmbedTableInsertV1 {
   format?: EmbedCellFormatV1[];
   /** 표 안 여백과 모든 칸의 안 여백(mm). 빠진 변은 한컴 기본 그대로 */
   cellPaddingMm?: EmbedCellPaddingV1;
+  /** 첫 행 = 제목 칸 + 쪽마다 제목 줄 반복 */
+  headerRow?: boolean;
 }
 
 /** 칸 안 여백(mm, 0–50) */
@@ -167,7 +172,9 @@ export function parseTableInsert(value: Record<string, unknown>): EmbedTableInse
   const heightsMm = parseSizes(value.heightsMm, rows, 'heightsMm');
   const format = parseFormats(value.format, rows, cols);
   const cellPaddingMm = parsePadding(value.cellPaddingMm);
-  const look = { ...(widthsMm && { widthsMm }), ...(heightsMm && { heightsMm }), ...(format && { format }), ...(cellPaddingMm && { cellPaddingMm }) };
+  if (value.headerRow !== undefined && typeof value.headerRow !== 'boolean') throw new Error('headerRow must be true or false');
+  const headerRow = value.headerRow === true;
+  const look = { ...(widthsMm && { widthsMm }), ...(heightsMm && { heightsMm }), ...(format && { format }), ...(cellPaddingMm && { cellPaddingMm }), ...(headerRow && { headerRow }) };
   if (value.cells === undefined) return { rows, cols, ...look };
   if (!Array.isArray(value.cells) || value.cells.length > rows) throw new Error(`cells must be an array of at most ${rows} rows`);
   const cells = value.cells.map((row, r) => {
@@ -256,6 +263,11 @@ export function insertTableAtCaret(ih: InputHandler, req: EmbedTableInsertV1): E
             if (align) wasm.applyParaFormatInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, 0, JSON.stringify({ alignment: align }));
           }
         }
+      }
+      // [lily] 제목 줄: 첫 행 칸 = 제목 칸, 표 = 제목 줄 반복(table-ui-ops tableSetHeaderRow 와 같은 값)
+      if (req.headerRow) {
+        for (let ci = 0; ci < req.cols; ci += 1) wasm.setCellProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, ci, { isHeader: true });
+        wasm.setTableProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, { repeatHeader: true });
       }
       // 캐럿은 표 다음 본문 문단의 처음 — 호스트가 이어서 글을 넣을 자리
       return { sectionIndex: pos.sectionIndex, paragraphIndex: r.paraIdx + 1, charOffset: 0 };

@@ -484,6 +484,8 @@ export declare class RhwpEditor {
       }>;
       /** [lily] 표 안 여백 + 모든 칸의 안 여백(mm, 0–50). 빠진 변은 한컴 기본 그대로 */
       cellPaddingMm?: { top?: number; bottom?: number; left?: number; right?: number };
+      /** [lily] 첫 행 = 제목 칸 + 쪽마다 제목 줄 반복(표 만들기와 같은 실행 취소 단계) */
+      headerRow?: boolean;
     }): Promise<{ ok: boolean; paragraph?: number; rows?: number; cols?: number }>;
     /** [lily] 캐럿 칸의 바탕색(#rrggbb, 없으면 null). 표 밖(또는 칸 안의 표)이면 inTable: false */
     cellFill(): Promise<{ inTable: boolean; color: string | null }>;

@@ -10,6 +10,9 @@ test('[lily] table.insert 인자: cellPaddingMm 은 네 변(mm, 0–50)만', () 
   assert.throws(() => parseTableInsert({ rows: 2, cols: 2, cellPaddingMm: { top: 51 } }), /0 to 50/);
   assert.throws(() => parseTableInsert({ rows: 2, cols: 2, cellPaddingMm: 3 }), /object/);
   assert.equal(parseTableInsert({ rows: 2, cols: 2 }).cellPaddingMm, undefined);
+  assert.equal(parseTableInsert({ rows: 2, cols: 2, headerRow: true }).headerRow, true);
+  assert.equal(parseTableInsert({ rows: 2, cols: 2, headerRow: false }).headerRow, undefined);
+  assert.throws(() => parseTableInsert({ rows: 2, cols: 2, headerRow: 1 }), /true or false/);
 });
 
 test('[lily] table.insert: 여백은 표와 모든 칸에, 글자 크기는 빈 칸에도 — 한 snapshot', () => {
@@ -46,4 +49,28 @@ test('[lily] table.insert: 여백은 표와 모든 칸에, 글자 크기는 빈 
   assert.equal(chars.length, 4, '빈 칸에도 글자 크기');
   assert.deepEqual(chars[0]!.slice(5), [0, 0, 2, JSON.stringify({ fontSize: 1100 })]);
   assert.deepEqual(chars[1]!.slice(5), [0, 0, 0, JSON.stringify({ fontSize: 1100 })]);
+});
+
+test('[lily] table.insert headerRow: 첫 행 칸 = 제목 칸, 표 = 제목 줄 반복 — 같은 snapshot', () => {
+  const calls: unknown[][] = [];
+  const wasm = {
+    createTable: () => ({ ok: true, paraIdx: 1, controlIdx: 0 }),
+    insertTextInCell: () => {},
+    setTableProperties: (...a: unknown[]) => calls.push(['table', ...a]),
+    setCellProperties: (...a: unknown[]) => calls.push(['cell', ...a]),
+    applyCharFormatInCell: () => {},
+    applyParaFormatInCell: () => {},
+  };
+  let ops = 0;
+  const ih = {
+    isCaretInBodyText: () => true,
+    getSelection: () => null,
+    getCursorPosition: () => ({ sectionIndex: 0, paragraphIndex: 1, charOffset: 0 }),
+    executeOperation: (op: { operation: (w: typeof wasm) => unknown }) => { ops += 1; op.operation(wasm); },
+    focus: () => {},
+  };
+  assert.equal(insertTableAtCaret(ih as never, parseTableInsert({ rows: 3, cols: 2, headerRow: true })).ok, true);
+  assert.equal(ops, 1, '실행 취소 한 단계');
+  assert.deepEqual(calls.filter((c) => c[0] === 'cell').map((c) => [c[4], c[5]]), [[0, { isHeader: true }], [1, { isHeader: true }]]);
+  assert.deepEqual(calls.filter((c) => c[0] === 'table'), [['table', 0, 1, 0, { repeatHeader: true }]]);
 });
