@@ -603,6 +603,17 @@ export class RhwpEditor {
       // [lily] 칸 바탕색 — cellFill(): 캐럿 칸 { inTable, color } · setCellFill(color): 셀 블록(없으면 캐럿 칸)에 #rrggbb(null = 없앰), 실행 취소 한 단계
       cellFill: () => this._request('table.cellFill', {}),
       setCellFill: (color) => this._request('table.setCellFill', { color }),
+      // [lily] 호스트 표 덧그림·도구 줄(rhwp-studio/src/embed/table-ui-ops.ts) — 쪽 좌표 = 확대 1 의 px, 바꿈은 실행 취소 한 단계
+      gridAt: (req) => this._request('table.gridAt', req),
+      state: () => this._request('table.state', {}),
+      bandRects: (req) => this._request('table.bandRects', req),
+      select: (req) => this._request('table.select', req),
+      insertAt: (req) => this._request('table.insertAt', req),
+      deleteLines: (req) => this._request('table.deleteLines', req),
+      move: (req) => this._request('table.move', req),
+      setBorders: (req) => this._request('table.setBorders', req),
+      setCellAlign: (req) => this._request('table.setCellAlign', req),
+      setHeaderRow: (req) => this._request('table.setHeaderRow', req),
     };
   }
 

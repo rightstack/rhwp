@@ -67,6 +67,9 @@ import type { EmbedFontActivationV1 } from '@/embed/rpc-router';
 import { charMods, embedFormatState, embedStyleList, paraMods } from '@/embed/format-bridge';
 import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { cellFillState, insertTableAtCaret, setCellFill } from '@/embed/table-ops';
+import {
+  tableBandRects, tableDeleteLines, tableGridAt, tableInsertAt, tableMove, tableSelect, tableSetBorders, tableSetCellAlign, tableSetHeaderRow, tableState,
+} from '@/embed/table-ui-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
 import { deletePictures, insertFloatingPicture, listPictures, pictureImage, selectedPictures, selectPictures, updatePictures } from '@/embed/picture-ops';
@@ -2335,6 +2338,56 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return setCellFill(inputHandler, req);
+    },
+    async tableGridAt(req) {
+      await initPromise;
+      if (wasm.pageCount === 0) return null;
+      return tableGridAt(wasm, req);
+    },
+    async tableState() {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return null;
+      return tableState(inputHandler, wasm);
+    },
+    async tableBandRects(req) {
+      await initPromise;
+      if (wasm.pageCount === 0) return [];
+      return tableBandRects(wasm, req);
+    },
+    async tableSelect(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSelect(inputHandler, wasm, req);
+    },
+    async tableInsertAt(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableInsertAt(inputHandler, req);
+    },
+    async tableDeleteLines(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableDeleteLines(inputHandler, wasm, req);
+    },
+    async tableMove(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableMove(inputHandler, wasm, req);
+    },
+    async tableSetBorders(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSetBorders(inputHandler, wasm, req);
+    },
+    async tableSetCellAlign(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSetCellAlign(inputHandler, wasm, req);
+    },
+    async tableSetHeaderRow(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSetHeaderRow(inputHandler, wasm, req);
     },
     async pageSetFill(req) {
       await initPromise;

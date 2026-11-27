@@ -1417,3 +1417,91 @@ fn insert_column_inherits_shape_when_row_has_only_merged_cells() {
         assert_inherited(cell, "insert_column");
     }
 }
+
+// ── [lily] 행·열 옮기기 ──
+
+fn lily_texts(table: &Table) -> Vec<Vec<String>> {
+    (0..table.row_count)
+        .map(|r| {
+            (0..table.col_count)
+                .map(|c| cell_text(table, r, c))
+                .collect()
+        })
+        .collect()
+}
+
+fn lily_lettered(rows: u16, cols: u16) -> Table {
+    let mut table = make_table(rows, cols);
+    for r in 0..rows {
+        for c in 0..cols {
+            set_cell_text(
+                &mut table,
+                r,
+                c,
+                &format!("{}{}", (b'a' + r as u8) as char, c),
+            );
+        }
+    }
+    table
+}
+
+#[test]
+fn lily_move_row_down_and_up() {
+    let mut table = lily_lettered(3, 2);
+    // 행 0 을 끝(경계 3)으로 → b, c, a
+    assert_eq!(table.move_row(0, 3).unwrap(), 2);
+    assert_eq!(
+        lily_texts(&table),
+        vec![vec!["b0", "b1"], vec!["c0", "c1"], vec!["a0", "a1"]]
+    );
+    // 행 2 를 처음(경계 0)으로 → a, b, c
+    assert_eq!(table.move_row(2, 0).unwrap(), 0);
+    assert_eq!(
+        lily_texts(&table),
+        vec![vec!["a0", "a1"], vec!["b0", "b1"], vec!["c0", "c1"]]
+    );
+    assert_eq!(table.row_sizes, vec![2, 2, 2]);
+}
+
+#[test]
+fn lily_move_row_keeps_cell_height() {
+    let mut table = lily_lettered(3, 1);
+    let idx = table.cell_index_at(0, 0).unwrap();
+    table.cells[idx].height = 2400;
+    table.move_row(0, 2).unwrap();
+    assert_eq!(table.cell_at(1, 0).unwrap().height, 2400);
+    assert_eq!(cell_text(&table, 1, 0), "a0");
+}
+
+#[test]
+fn lily_move_column_right() {
+    let mut table = lily_lettered(2, 3);
+    let idx = table.cell_index_at(0, 0).unwrap();
+    table.cells[idx].width = 5000;
+    assert_eq!(table.move_column(0, 2).unwrap(), 1);
+    assert_eq!(
+        lily_texts(&table),
+        vec![vec!["a1", "a0", "a2"], vec!["b1", "b0", "b2"]]
+    );
+    assert_eq!(table.cell_at(0, 1).unwrap().width, 5000);
+}
+
+#[test]
+fn lily_move_in_place_is_noop() {
+    let mut table = lily_lettered(3, 2);
+    assert_eq!(table.move_row(1, 1).unwrap(), 1);
+    assert_eq!(table.move_row(1, 2).unwrap(), 1);
+    assert_eq!(cell_text(&table, 1, 0), "b0");
+    assert!(table.move_row(3, 0).is_err());
+    assert!(table.move_column(0, 4).is_err());
+}
+
+#[test]
+fn lily_move_rejects_merged_cells_in_range() {
+    let mut table = lily_lettered(3, 2);
+    table.merge_cells(1, 0, 2, 0).unwrap();
+    // 행 0 → 끝: 행 1–2 의 세로 병합이 걸린다
+    assert!(table.move_row(0, 3).is_err());
+    // 열 옮기기에는 세로 병합이 걸리지 않는다
+    assert!(table.move_column(1, 0).is_ok());
+}

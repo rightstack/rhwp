@@ -2192,6 +2192,52 @@ impl HwpDocument {
         .map_err(|e| e.into())
     }
 
+    /// [lily] 표의 행 하나를 경계 `line`(0 = 첫 행 앞, 행 수 = 끝) 앞으로 옮긴다. 칸이 통째로 따라간다.
+    ///
+    /// 반환값: JSON `{"ok":true,"index":<옮긴 뒤 행 번호>}`. 세로로 합친 칸이 걸리면 에러.
+    #[wasm_bindgen(js_name = moveTableRow)]
+    pub fn move_table_row(
+        &mut self,
+        section_idx: u32,
+        parent_para_idx: u32,
+        control_idx: u32,
+        from: u32,
+        line: u32,
+    ) -> Result<String, JsValue> {
+        self.move_table_line_native(
+            section_idx as usize,
+            parent_para_idx as usize,
+            control_idx as usize,
+            false,
+            from as u16,
+            line as u16,
+        )
+        .map_err(|e| e.into())
+    }
+
+    /// [lily] 표의 열 하나를 경계 `line`(0 = 첫 열 앞, 열 수 = 끝) 앞으로 옮긴다. 칸이 통째로 따라간다.
+    ///
+    /// 반환값: JSON `{"ok":true,"index":<옮긴 뒤 열 번호>}`. 가로로 합친 칸이 걸리면 에러.
+    #[wasm_bindgen(js_name = moveTableColumn)]
+    pub fn move_table_column(
+        &mut self,
+        section_idx: u32,
+        parent_para_idx: u32,
+        control_idx: u32,
+        from: u32,
+        line: u32,
+    ) -> Result<String, JsValue> {
+        self.move_table_line_native(
+            section_idx as usize,
+            parent_para_idx as usize,
+            control_idx as usize,
+            true,
+            from as u16,
+            line as u16,
+        )
+        .map_err(|e| e.into())
+    }
+
     /// 표의 셀을 병합한다.
     ///
     /// 반환값: JSON `{"ok":true,"cellCount":<N>}`

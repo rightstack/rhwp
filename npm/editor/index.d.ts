@@ -2,6 +2,30 @@
  * @rhwp/editor — HWP 에디터 웹 컴포넌트
  */
 
+/** [lily] 표 참조(구역 · 본문 문단 · 컨트롤) */
+export interface RhwpTableRef { sec: number; ppi: number; ci: number }
+/** [lily] 쪽 위 사각형 [쪽, x, y, w, h](쪽 좌표 = 확대 1 의 px) */
+export type RhwpPageRect = [number, number, number, number, number];
+export interface RhwpTableGrid {
+  ref: RhwpTableRef; page: number; pageWidth: number; rows: number; cols: number;
+  left: number; top: number; right: number; bottom: number;
+  cell: [number, number, number, number]; cellRow: number; cellCol: number;
+  colLines: number[]; rowBands: { row: number; top: number; bottom: number }[]; first: boolean;
+}
+export interface RhwpTableState {
+  ref: RhwpTableRef; rows: number; cols: number;
+  caret: { row: number; col: number } | null;
+  sel: { r0: number; c0: number; r1: number; c1: number; wholeRows: boolean; wholeCols: boolean; table: boolean } | null;
+  objectSelected: boolean;
+  selFrames: RhwpPageRect[]; tableFrames: RhwpPageRect[]; pageWidths: Record<number, number>;
+  fill: string | null; vAlign: 'top' | 'center' | 'bottom';
+  borders: {
+    top: boolean | null; bottom: boolean | null; left: boolean | null; right: boolean | null; insideH: boolean | null; insideV: boolean | null;
+    span: [number, number]; style: string | null; widthPt: number | null; color: string | null;
+  };
+  headerRow: boolean;
+}
+
 export interface EditorOptions {
   /** rhwp-studio HTTP(S) URL. file:, data:, browser extension 등 opaque origin은 지원하지 않음 */
   studioUrl?: string;
@@ -463,6 +487,26 @@ export declare class RhwpEditor {
     cellFill(): Promise<{ inTable: boolean; color: string | null }>;
     /** [lily] 셀 블록 선택(없으면 캐럿 칸)의 바탕색 #rrggbb, null = 없앰. 실행 취소 한 단계. 표 밖이면 ok: false */
     setCellFill(color: string | null): Promise<{ ok: boolean }>;
+    /** [lily] 쪽 점(fx · fy = 쪽 폭 · 높이에 대한 비율) 아래 표의 꼴 — 쪽 좌표(확대 1 의 px)의 열 경계 · 행 띠 · 포인터 아래 칸. 표 칸 위가 아니면 null */
+    gridAt(req: { page: number; fx: number; fy: number }): Promise<RhwpTableGrid | null>;
+    /** [lily] 캐럿·셀 블록·표 개체 선택이 있는 표의 상태(고른 범위 · 틀 · 바탕 · 맞춤 · 테두리 · 제목 줄). 표 밖이면 null */
+    state(): Promise<RhwpTableState | null>;
+    /** [lily] 행·열 구간의 쪽별 사각형(넣은·옮긴 줄 깜빡임) */
+    bandRects(req: RhwpTableRef & { axis: 'row' | 'col'; from: number; to: number }): Promise<RhwpPageRect[]>;
+    /** [lily] 셀 블록 고르기(F5 · 끌기와 같은 상태) */
+    select(req: RhwpTableRef & { r0: number; c0: number; r1: number; c1: number }): Promise<{ ok: boolean }>;
+    /** [lily] 경계 line(0 = 첫 행·열 앞)에 행·열 하나 — 실행 취소 한 단계, 캐럿은 새 줄 첫 칸 */
+    insertAt(req: RhwpTableRef & { axis: 'row' | 'col'; line: number }): Promise<{ ok: boolean; index?: number; rects?: RhwpPageRect[] }>;
+    /** [lily] 고른 행·열(없으면 캐럿 줄)·표 지우기 — 모든 줄이면 표를 지운다 */
+    deleteLines(req: { what: 'rows' | 'cols' | 'table' }): Promise<{ ok: boolean }>;
+    /** [lily] 행·열 하나를 경계 line 앞으로(칸이 통째로) — 합친 칸이 걸리면 ok: false, reason: 'merged' */
+    move(req: RhwpTableRef & { axis: 'row' | 'col'; from: number; line: number }): Promise<{ ok: boolean; index?: number; rects?: RhwpPageRect[]; reason?: string }>;
+    /** [lily] 셀 테두리 여덟(켜기 · 끄기) 또는 restyle — 선 모양(공용 이름) · 굵기 pt · 색 */
+    setBorders(req: { kind: 'all' | 'outside' | 'inside' | 'none' | 'top' | 'bottom' | 'left' | 'right' | 'restyle'; on?: boolean; style?: string; widthPt?: number; color?: string | null }): Promise<{ ok: boolean }>;
+    /** [lily] 셀 세로 맞춤 */
+    setCellAlign(req: { v: 'top' | 'center' | 'bottom' }): Promise<{ ok: boolean }>;
+    /** [lily] 제목 줄(첫 행 = 제목 칸 + 제목 줄 자동 반복) */
+    setHeaderRow(req: { on: boolean }): Promise<{ ok: boolean }>;
   };
 
   /** 본문 위치에 글 넣기(`\n` = 문단 나누기, 실행 취소 한 단계). 좌표가 본문 문단 밖이면 ok: false.

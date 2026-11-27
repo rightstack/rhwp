@@ -26,6 +26,10 @@ import {
 } from './format-bridge.ts';
 import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoInsertV1 } from './memo-ops.ts';
 import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
+import {
+  parseBandRects, parseCellAlign, parseDeleteLines, parseGridAt, parseHeaderRow, parseInsertAt, parseMove, parseSelect, parseSetBorders,
+  type EmbedPageRectV1, type EmbedSetBordersV1, type EmbedTableGridV1, type EmbedTableRefV1, type EmbedTableStateV1,
+} from './table-ui-ops.ts';
 import { parseCellFill, parseTableInsert, type EmbedCellFillStateV1, type EmbedCellFillV1, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
 import { parseChartInsert, parseChartReplace, type EmbedChartInsertV1, type EmbedChartReplaceV1, type EmbedChartSelectedV1 } from './chart-ops.ts';
 import {
@@ -144,6 +148,17 @@ export interface EmbedRpcHandlers {
   /** [lily] 캐럿 칸 바탕색 읽기 · 셀 블록(없으면 캐럿 칸) 바탕색 바꾸기(실행 취소 한 단계) */
   tableCellFill(): Promise<EmbedCellFillStateV1>;
   tableSetCellFill(req: EmbedCellFillV1): Promise<{ ok: boolean }>;
+  /** [lily] 호스트 표 덧그림·도구 줄(table-ui-ops.ts): 쪽 점 아래 표 꼴 · 표 상태 · 줄 사각형 · 셀 블록 고르기 · 경계에 넣기 · 지우기 · 옮기기 · 테두리 · 세로 맞춤 · 제목 줄 */
+  tableGridAt(req: { page: number; fx: number; fy: number }): Promise<EmbedTableGridV1 | null>;
+  tableState(): Promise<EmbedTableStateV1 | null>;
+  tableBandRects(req: EmbedTableRefV1 & { axis: 'row' | 'col'; from: number; to: number }): Promise<EmbedPageRectV1[]>;
+  tableSelect(req: EmbedTableRefV1 & { r0: number; c0: number; r1: number; c1: number }): Promise<{ ok: boolean }>;
+  tableInsertAt(req: EmbedTableRefV1 & { axis: 'row' | 'col'; line: number }): Promise<{ ok: boolean; index?: number; rects?: EmbedPageRectV1[] }>;
+  tableDeleteLines(req: { what: 'rows' | 'cols' | 'table' }): Promise<{ ok: boolean }>;
+  tableMove(req: EmbedTableRefV1 & { axis: 'row' | 'col'; from: number; line: number }): Promise<{ ok: boolean; index?: number; rects?: EmbedPageRectV1[]; reason?: string }>;
+  tableSetBorders(req: EmbedSetBordersV1): Promise<{ ok: boolean }>;
+  tableSetCellAlign(req: { v: 'top' | 'center' | 'bottom' }): Promise<{ ok: boolean }>;
+  tableSetHeaderRow(req: { on: boolean }): Promise<{ ok: boolean }>;
   shapeInsert(req: EmbedShapeInsertV1): Promise<EmbedPageOpResultV1>;
   /** [lily] 차트(그림 + 설명에 실은 정의) 넣기 · 고른 차트 읽기 · 바꾸기 */
   pictureInsert(req: EmbedPictureInsertV1): Promise<EmbedPictureInsertResultV1>;
@@ -441,6 +456,36 @@ export async function routeEmbedRequest(
     case 'table.setCellFill':
       assertOnlyKeys(params, ['color'], 'table.setCellFill params');
       return handlers.tableSetCellFill(parseCellFill(params));
+    case 'table.gridAt':
+      assertOnlyKeys(params, ['page', 'fx', 'fy'], 'table.gridAt params');
+      return handlers.tableGridAt(parseGridAt(params));
+    case 'table.state':
+      assertOnlyKeys(params, [], 'table.state params');
+      return handlers.tableState();
+    case 'table.bandRects':
+      assertOnlyKeys(params, ['sec', 'ppi', 'ci', 'axis', 'from', 'to'], 'table.bandRects params');
+      return handlers.tableBandRects(parseBandRects(params));
+    case 'table.select':
+      assertOnlyKeys(params, ['sec', 'ppi', 'ci', 'r0', 'c0', 'r1', 'c1'], 'table.select params');
+      return handlers.tableSelect(parseSelect(params));
+    case 'table.insertAt':
+      assertOnlyKeys(params, ['sec', 'ppi', 'ci', 'axis', 'line'], 'table.insertAt params');
+      return handlers.tableInsertAt(parseInsertAt(params));
+    case 'table.deleteLines':
+      assertOnlyKeys(params, ['what'], 'table.deleteLines params');
+      return handlers.tableDeleteLines(parseDeleteLines(params));
+    case 'table.move':
+      assertOnlyKeys(params, ['sec', 'ppi', 'ci', 'axis', 'from', 'line'], 'table.move params');
+      return handlers.tableMove(parseMove(params));
+    case 'table.setBorders':
+      assertOnlyKeys(params, ['kind', 'on', 'style', 'widthPt', 'color'], 'table.setBorders params');
+      return handlers.tableSetBorders(parseSetBorders(params));
+    case 'table.setCellAlign':
+      assertOnlyKeys(params, ['v'], 'table.setCellAlign params');
+      return handlers.tableSetCellAlign(parseCellAlign(params));
+    case 'table.setHeaderRow':
+      assertOnlyKeys(params, ['on'], 'table.setHeaderRow params');
+      return handlers.tableSetHeaderRow(parseHeaderRow(params));
     case 'page.setFill':
       assertOnlyKeys(params, ['color'], 'page.setFill params');
       return handlers.pageSetFill(parsePageFill(params));

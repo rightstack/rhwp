@@ -185,6 +185,19 @@ fn checked_table_u16_add(value: u16, delta: u16, field: &str) -> Result<u16, Str
         .ok_or_else(|| format!("{field}가 u16 범위를 초과합니다"))
 }
 
+/// [lily] 줄 하나를 `from` 에서 `to` 로 옮길 때 줄 번호 `i` 의 새 번호(사이의 줄은 한 칸씩 밀린다).
+fn moved_line_index(i: u16, from: u16, to: u16) -> u16 {
+    if i == from {
+        to
+    } else if from < to && i > from && i <= to {
+        i - 1
+    } else if to < from && i >= to && i < from {
+        i + 1
+    } else {
+        i
+    }
+}
+
 fn checked_table_span_end(start: u16, span: u16, axis: &str) -> Result<u16, String> {
     if span == 0 {
         return Err(format!("손상된 셀({axis} span 0)은 편집할 수 없습니다"));
@@ -1700,6 +1713,68 @@ impl Table {
         self.rebuild_grid();
 
         Ok(())
+    }
+
+    /// [lily] 행 하나를 경계 `line` 앞으로 옮긴다(`line` = 0 이면 첫 행 앞, `row_count` 면 끝).
+    /// 칸(글·속성·높이)이 통째로 따라간다. 옮긴 뒤의 행 번호를 돌려준다.
+    /// 옮기는 행부터 놓일 자리까지 사이에 세로로 합친 칸이 걸려 있으면 거절한다.
+    pub fn move_row(&mut self, from: u16, line: u16) -> Result<u16, String> {
+        if from >= self.row_count || line > self.row_count {
+            return Err(format!(
+                "행 옮기기 범위 초과 (from {}, line {}, 총 {}행)",
+                from, line, self.row_count
+            ));
+        }
+        let to = if line > from { line - 1 } else { line };
+        if to == from {
+            return Ok(from);
+        }
+        let (lo, hi) = (from.min(to), from.max(to));
+        if self
+            .cells
+            .iter()
+            .any(|c| c.row_span > 1 && c.row <= hi && c.row.saturating_add(c.row_span) > lo)
+        {
+            return Err("합친 칸이 걸려 있어 옮길 수 없습니다".to_string());
+        }
+        for cell in &mut self.cells {
+            cell.row = moved_line_index(cell.row, from, to);
+        }
+        self.rebuild_row_sizes();
+        self.cells.sort_by_key(|c| (c.row, c.col));
+        self.rebuild_grid();
+        Ok(to)
+    }
+
+    /// [lily] 열 하나를 경계 `line` 앞으로 옮긴다(`line` = 0 이면 첫 열 앞, `col_count` 면 끝).
+    /// 칸(글·속성·너비)이 통째로 따라간다. 옮긴 뒤의 열 번호를 돌려준다.
+    /// 옮기는 열부터 놓일 자리까지 사이에 가로로 합친 칸이 걸려 있으면 거절한다.
+    pub fn move_column(&mut self, from: u16, line: u16) -> Result<u16, String> {
+        if from >= self.col_count || line > self.col_count {
+            return Err(format!(
+                "열 옮기기 범위 초과 (from {}, line {}, 총 {}열)",
+                from, line, self.col_count
+            ));
+        }
+        let to = if line > from { line - 1 } else { line };
+        if to == from {
+            return Ok(from);
+        }
+        let (lo, hi) = (from.min(to), from.max(to));
+        if self
+            .cells
+            .iter()
+            .any(|c| c.col_span > 1 && c.col <= hi && c.col.saturating_add(c.col_span) > lo)
+        {
+            return Err("합친 칸이 걸려 있어 옮길 수 없습니다".to_string());
+        }
+        for cell in &mut self.cells {
+            cell.col = moved_line_index(cell.col, from, to);
+        }
+        self.rebuild_row_sizes();
+        self.cells.sort_by_key(|c| (c.row, c.col));
+        self.rebuild_grid();
+        Ok(to)
     }
 
     /// 직사각형 범위의 셀을 병합한다.

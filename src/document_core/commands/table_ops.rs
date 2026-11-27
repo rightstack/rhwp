@@ -100,6 +100,59 @@ impl DocumentCore {
         )))
     }
 
+    /// [lily] 표의 행(axis_col = false) 또는 열(true) 하나를 경계 `line` 앞으로 옮긴다 (네이티브).
+    /// 반환: JSON `{"ok":true,"index":<옮긴 뒤 번호>}`. 합친 칸이 걸리면 에러.
+    pub fn move_table_line_native(
+        &mut self,
+        section_idx: usize,
+        parent_para_idx: usize,
+        control_idx: usize,
+        axis_col: bool,
+        from: u16,
+        line: u16,
+    ) -> Result<String, HwpError> {
+        let table = self.get_table_mut(section_idx, parent_para_idx, control_idx)?;
+        let index = if axis_col {
+            table.move_column(from, line)
+        } else {
+            table.move_row(from, line)
+        }
+        .map_err(HwpError::RenderError)?;
+
+        self.document.sections[section_idx].raw_stream = None;
+        self.recompose_section(section_idx);
+        self.paginate_if_needed();
+
+        // 옮기기 = 그 줄을 지우고 다른 자리에 넣은 것
+        if axis_col {
+            self.event_log.push(DocumentEvent::TableColumnDeleted {
+                section: section_idx,
+                para: parent_para_idx,
+                ctrl: control_idx,
+            });
+            self.event_log.push(DocumentEvent::TableColumnInserted {
+                section: section_idx,
+                para: parent_para_idx,
+                ctrl: control_idx,
+            });
+        } else {
+            self.event_log.push(DocumentEvent::TableRowDeleted {
+                section: section_idx,
+                para: parent_para_idx,
+                ctrl: control_idx,
+            });
+            self.event_log.push(DocumentEvent::TableRowInserted {
+                section: section_idx,
+                para: parent_para_idx,
+                ctrl: control_idx,
+            });
+        }
+        Ok(super::super::helpers::json_ok_with(&format!(
+            "\"index\":{}",
+            index
+        )))
+    }
+
     /// 표에 열을 삽입한다 (네이티브).
     pub fn insert_table_column_native(
         &mut self,
