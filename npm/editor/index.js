@@ -598,7 +598,7 @@ export class RhwpEditor {
 
   get table() {
     return {
-      // [lily] look = { widthsMm?, heightsMm?, format? } — 칸 너비 · 줄 높이 · 범위별 꾸밈(바탕 · 테두리 · 맞춤 · 글자)
+      // [lily] look = { widthsMm?, heightsMm?, format?, cellPaddingMm? } — 칸 너비 · 줄 높이 · 범위별 꾸밈(바탕 · 테두리 · 맞춤 · 글자) · 칸 안 여백
       insert: (rows, cols, cells, look) => this._request('table.insert', { rows, cols, ...(cells !== undefined && { cells }), ...(look ?? {}) }),
       // [lily] 칸 바탕색 — cellFill(): 캐럿 칸 { inTable, color } · setCellFill(color): 셀 블록(없으면 캐럿 칸)에 #rrggbb(null = 없앰), 실행 취소 한 단계
       cellFill: () => this._request('table.cellFill', {}),

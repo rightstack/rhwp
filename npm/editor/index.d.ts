@@ -482,6 +482,8 @@ export declare class RhwpEditor {
         rows?: [number, number]; cols?: [number, number]; fill?: string; border?: { color: string; width?: number; type?: number };
         vAlign?: 'top' | 'center' | 'bottom'; bold?: boolean; color?: string; sizePt?: number; align?: 'left' | 'center' | 'right' | 'justify';
       }>;
+      /** [lily] 표 안 여백 + 모든 칸의 안 여백(mm, 0–50). 빠진 변은 한컴 기본 그대로 */
+      cellPaddingMm?: { top?: number; bottom?: number; left?: number; right?: number };
     }): Promise<{ ok: boolean; paragraph?: number; rows?: number; cols?: number }>;
     /** [lily] 캐럿 칸의 바탕색(#rrggbb, 없으면 null). 표 밖(또는 칸 안의 표)이면 inTable: false */
     cellFill(): Promise<{ inTable: boolean; color: string | null }>;

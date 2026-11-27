@@ -10,6 +10,10 @@
  * 문단 맞춤)을 준다 — 표 › 셀 속성 대화 상자와 글자/문단 모양이 쓰는 것과 같은 wasm 함수(setCellProperties ·
  * applyCharFormatInCell · applyParaFormatInCell)이고, 표 만들기와 한 실행 취소 단계다. 호스트는 대화 상자를 띄울 수 없어
  * 꾸민 표(머리 줄에 색이 있는 표, 양식)를 만들 길이 없었다.
+ *
+ * [lily] 칸 안 여백 · 빈 칸 글자(2026-11-27): `cellPaddingMm` = 표 안 여백(표 속성)과 모든 칸의 안 여백(셀 속성)을 같은 값으로 —
+ * 호스트가 새 표의 기본 여백을 한컴 기본(위·아래 0.5mm)보다 넉넉하게 준다. 글자 꾸밈(굵기 · 색 · 크기)은 빈 칸에도 준다
+ * (빈 문단의 글자 모양 — 나중에 그 칸에 치는 글이 그 모양을 따른다).
  */
 import type { InputHandler } from '../engine/input-handler.ts';
 import type { WasmBridge } from '../core/wasm-bridge.ts';
@@ -47,6 +51,16 @@ export interface EmbedTableInsertV1 {
   /** 줄 높이(mm), 줄 차례대로. 모자란 줄은 그대로 */
   heightsMm?: number[];
   format?: EmbedCellFormatV1[];
+  /** 표 안 여백과 모든 칸의 안 여백(mm). 빠진 변은 한컴 기본 그대로 */
+  cellPaddingMm?: EmbedCellPaddingV1;
+}
+
+/** 칸 안 여백(mm, 0–50) */
+export interface EmbedCellPaddingV1 {
+  top?: number;
+  bottom?: number;
+  left?: number;
+  right?: number;
 }
 
 export interface EmbedTableInsertResultV1 {
@@ -131,13 +145,29 @@ function parseFormats(value: unknown, rows: number, cols: number): EmbedCellForm
   });
 }
 
+const PADDING_SIDES = ['top', 'bottom', 'left', 'right'] as const;
+
+function parsePadding(value: unknown): EmbedCellPaddingV1 | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new Error('cellPaddingMm must be an object');
+  const out: EmbedCellPaddingV1 = {};
+  for (const k of Object.keys(value)) {
+    if (!(PADDING_SIDES as readonly string[]).includes(k)) throw new Error(`cellPaddingMm.${k} is not a known side`);
+    const v = value[k];
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 50) throw new Error(`cellPaddingMm.${k} must be a number from 0 to 50 (mm)`);
+    out[k as (typeof PADDING_SIDES)[number]] = v;
+  }
+  return out;
+}
+
 export function parseTableInsert(value: Record<string, unknown>): EmbedTableInsertV1 {
   const rows = count(value.rows, MAX_TABLE_ROWS, 'rows');
   const cols = count(value.cols, MAX_TABLE_COLS, 'cols');
   const widthsMm = parseSizes(value.widthsMm, cols, 'widthsMm');
   const heightsMm = parseSizes(value.heightsMm, rows, 'heightsMm');
   const format = parseFormats(value.format, rows, cols);
-  const look = { ...(widthsMm && { widthsMm }), ...(heightsMm && { heightsMm }), ...(format && { format }) };
+  const cellPaddingMm = parsePadding(value.cellPaddingMm);
+  const look = { ...(widthsMm && { widthsMm }), ...(heightsMm && { heightsMm }), ...(format && { format }), ...(cellPaddingMm && { cellPaddingMm }) };
   if (value.cells === undefined) return { rows, cols, ...look };
   if (!Array.isArray(value.cells) || value.cells.length > rows) throw new Error(`cells must be an array of at most ${rows} rows`);
   const cells = value.cells.map((row, r) => {
@@ -181,6 +211,17 @@ function lookOf(req: EmbedTableInsertV1, row: number, col: number): { props: Rec
   return { props, char, ...(align && { align }) };
 }
 
+/** 칸 안 여백(mm) → 표·셀 속성의 paddingTop · paddingBottom · paddingLeft · paddingRight(HWPUNIT). 준 변이 없으면 null */
+function paddingProps(p: EmbedCellPaddingV1 | undefined): Record<string, number> | null {
+  if (!p) return null;
+  const out: Record<string, number> = {};
+  if (p.top !== undefined) out.paddingTop = hwpunit(p.top);
+  if (p.bottom !== undefined) out.paddingBottom = hwpunit(p.bottom);
+  if (p.left !== undefined) out.paddingLeft = hwpunit(p.left);
+  if (p.right !== undefined) out.paddingRight = hwpunit(p.right);
+  return Object.keys(out).length ? out : null;
+}
+
 /** 캐럿(선택이 있으면 그 시작) 자리에 표를 만들고 칸의 글을 넣는다. 본문 문단이 아니면(표 안·머리말 등) ok: false */
 export function insertTableAtCaret(ih: InputHandler, req: EmbedTableInsertV1): EmbedTableInsertResultV1 {
   if (!ih.isCaretInBodyText()) return { ok: false };
@@ -197,7 +238,13 @@ export function insertTableAtCaret(ih: InputHandler, req: EmbedTableInsertV1): E
       (req.cells ?? []).forEach((row, ri) => row.forEach((text, ci) => {
         if (text) wasm.insertTextInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, ri * req.cols + ci, 0, 0, text);
       }));
-      // [lily] 칸 꾸밈: 글을 넣은 뒤에(글자 모양은 들어 있는 글에 준다)
+      // [lily] 칸 안 여백: 표 안 여백(표 속성) + 칸마다(셀 속성) — 표 만들기가 둘을 같은 값으로 두는 것과 같게
+      const pad = paddingProps(req.cellPaddingMm);
+      if (pad) {
+        wasm.setTableProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, pad);
+        for (let cell = 0; cell < req.rows * req.cols; cell += 1) wasm.setCellProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, pad);
+      }
+      // [lily] 칸 꾸밈: 글을 넣은 뒤에(글자 모양은 들어 있는 글에, 빈 칸이면 빈 문단의 글자 모양에 준다)
       if (req.widthsMm || req.heightsMm || req.format) {
         for (let ri = 0; ri < req.rows; ri += 1) {
           for (let ci = 0; ci < req.cols; ci += 1) {
@@ -205,7 +252,7 @@ export function insertTableAtCaret(ih: InputHandler, req: EmbedTableInsertV1): E
             const { props, char, align } = lookOf(req, ri, ci);
             if (Object.keys(props).length) wasm.setCellProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, props);
             const len = (req.cells?.[ri]?.[ci] ?? '').length;
-            if (len && Object.keys(char).length) wasm.applyCharFormatInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, 0, 0, len, JSON.stringify(char));
+            if (Object.keys(char).length) wasm.applyCharFormatInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, 0, 0, len, JSON.stringify(char));
             if (align) wasm.applyParaFormatInCell(pos.sectionIndex, r.paraIdx, r.controlIdx, cell, 0, JSON.stringify({ alignment: align }));
           }
         }
