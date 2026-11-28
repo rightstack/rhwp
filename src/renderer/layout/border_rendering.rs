@@ -755,8 +755,10 @@ fn inset_horizontal_border_group_at_top_clip(nodes: &mut [RenderNode], clip_y: f
     }
 }
 
-/// 투명 테두리를 빨간색 점선 Line 노드로 생성한다.
+/// 투명 테두리를 점선 Line 노드로 생성한다.
 /// 엣지 그리드에서 None 슬롯(투명 테두리)을 찾아 연속 구간을 병합한다.
+/// [lily] 색 · 굵기 = LilyOffice 표 눈금선(lily-docs `gridlines.rs` GRIDLINE_COLOR #9DB9DD, 옅은 파랑 점선) — 한컴의 빨간 점선 대신
+/// 테두리 없는 표가 lily-docs 와 같게 보인다(편집 화면 전용 선이라 인쇄 · 내보내기에는 없다).
 pub(crate) fn render_transparent_borders(
     tree: &mut PageLayoutContext,
     h_edges: &[Vec<Option<BorderLine>>],
@@ -769,8 +771,8 @@ pub(crate) fn render_transparent_borders(
     table_y: f64,
 ) -> Vec<RenderNode> {
     let mut nodes = Vec::new();
-    let color: u32 = 0x0000FF; // BGR: Red
-    let width = 0.4_f64;
+    let color: u32 = 0xDDB99D; // BGR: #9DB9DD ([lily] 옅은 파랑 — upstream 은 0x0000FF 빨강)
+    let width = 0.75_f64; // [lily] ≈ 0.5pt(upstream 0.4px)
     let dash = StrokeDash::Dot;
     let row_count = if row_y.len() > 1 { row_y.len() - 1 } else { 0 };
     let is_h_covered = |ri: usize, ci: usize| -> bool {
