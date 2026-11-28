@@ -626,6 +626,8 @@ export class RhwpEditor {
       resetStyle: () => this._request('table.resetStyle', {}),
       // [lily 3] 표 스타일(lily-docs 카드 + 옵션 여섯) — 칸마다 직접 꾸밈 + 표 개체 설명문 표지
       setStyle: (req) => this._request('table.setStyle', req),
+      // [lily 3] F5 셀 선택 단계 켜고 끄기(끄면 점 · 상태 글 감춤, F5 반복 없음, 방향키 = 옮기기 · Shift = 넓히기)
+      setCellPhases: (req) => this._request('table.setCellPhases', req),
     };
   }
 

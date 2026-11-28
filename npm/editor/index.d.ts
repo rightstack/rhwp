@@ -556,6 +556,8 @@ export declare class RhwpEditor {
     resetStyle(): Promise<{ ok: boolean }>;
     /** [lily 3] 표 스타일(카드 null = 스타일 없음) · 옵션 여섯 — 칸마다 꾸밈 + 표 개체 설명문 `lily-table-style:` 표지(hwp · hwpx 저장에 실린다) */
     setStyle(req: { style: RhwpTableStyle; clearText?: boolean }): Promise<{ ok: boolean }>;
+    /** [lily 3] F5 셀 선택 단계(마지막 칸 점 · 상태 글 · F5 반복 1→2→3 · 단계별 방향키) — false = 끔: 방향키 = 한 칸 옮기기, Shift+방향키 = 범위 넓히기 */
+    setCellPhases(req: { on: boolean }): Promise<{ ok: boolean }>;
   };
 
   /** 본문 위치에 글 넣기(`\n` = 문단 나누기, 실행 취소 한 단계). 좌표가 본문 문단 밖이면 ok: false.

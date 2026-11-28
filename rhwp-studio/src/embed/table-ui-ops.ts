@@ -1177,3 +1177,58 @@ export function tableSetHeaderRow(ih: InputHandler, wasm: WasmBridge, req: { on:
   void wasm;
   return { ok };
 }
+
+// ── [lily 3] F5 셀 선택 단계 끄기(2026-11-28 LilyOffice 에이치독스 영일 "해당 버튼? 점? 이게 안 보이게 할 수 있어? 동작도 끄고. 이건 따로 검토해야 할 것 같아서.") ──
+// studio 의 F5 셀 블록은 단계가 셋이다(cell-selection-phase.ts — 1 = 한 칸 · 방향키로 옮기기, 2 = 범위 · 방향키로 넓히기, 3 = 표 전체, F5 를 누를 때마다 다음 단계).
+// 단계는 마지막 칸의 점(cell-selection-renderer `.cell-selection-phase-marker`)과 상태 줄 글(#sb-cell-selection)로 보인다.
+// 호스트가 끄면(table.setCellPhases {on: false}): 점 · 상태 글을 감추고, 셀 블록에서 F5 를 다시 눌러도 단계가 바뀌지 않으며, 방향키는 단계와 상관없이
+// 그냥 방향키 = 한 칸으로 옮기기 · Shift+방향키 = 범위 넓히기(표 계산기와 같은 꼴). Ctrl/⌘+방향키(칸 크기 조절)와 보호 칸 선택은 그대로 studio.
+// upstream 파일은 고치지 않는다 — 문서 capture 단계 keydown 이 studio 입력 칸의 처리보다 먼저 받는다. 켜면(기본) upstream 동작 그대로.
+let cellPhases = true;
+let phaseGuard: ((e: KeyboardEvent) => void) | null = null;
+const PHASE_STYLE_ID = 'lily-cell-phase-off';
+interface PhaseCursor {
+  isProtectedCellSelectionMode(): boolean;
+  moveCellSelection(dr: number, dc: number): void;
+  expandCellSelection(dr: number, dc: number): void;
+}
+export function parseCellPhases(p: Record<string, unknown>): { on: boolean } {
+  if (typeof p.on !== 'boolean') throw new Error('on must be true or false');
+  return { on: p.on };
+}
+export function tableSetCellPhases(ih: InputHandler, req: { on: boolean }, doc: Document = document): { ok: boolean } {
+  cellPhases = req.on;
+  let style = doc.getElementById(PHASE_STYLE_ID);
+  if (!req.on && !style) {
+    style = doc.createElement('style');
+    style.id = PHASE_STYLE_ID;
+    style.textContent = '.cell-selection-phase-marker, #sb-cell-selection { display: none !important; }';
+    doc.head.appendChild(style);
+  } else if (req.on) style?.remove();
+  if (!phaseGuard) {
+    phaseGuard = (e: KeyboardEvent) => {
+      if (cellPhases || e.isComposing || !ih.isInCellSelectionMode()) return;
+      const L = ih as unknown as IhInternals & { cursor: IhInternals['cursor'] & PhaseCursor };
+      if (L.cursor.isProtectedCellSelectionMode()) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'F5') {
+        // 단계 진행 없음(셀 블록 그대로)
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      const dr = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+      const dc = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+      if (!dr && !dc) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.shiftKey) L.cursor.expandCellSelection(dr, dc);
+      else L.cursor.moveCellSelection(dr, dc);
+      L.caret.hide();
+      L.updateCellSelection();
+      L.eventBus.emit('command-state-changed');
+    };
+    doc.addEventListener('keydown', phaseGuard, true);
+  }
+  return { ok: true };
+}

@@ -69,7 +69,7 @@ import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { cellFillState, insertTableAtCaret, setCellFill } from '@/embed/table-ops';
 import {
   tableBandRects, tableDeleteLines, tableGridAt, tableInsertAt, tableMove, tableSelect, tableSetBorders, tableSetCellAlign, tableSetHeaderRow, tableState,
-  gridlinesPreference, tableResetStyle, tableSetStyle, tableResize, tableResizeLine, tableSetCellSize, tableSetCount, tableSetGridlines, tableSetPadding, tableSetTextDirection, tableSplitCells,
+  gridlinesPreference, tableResetStyle, tableSetCellPhases, tableSetStyle, tableResize, tableResizeLine, tableSetCellSize, tableSetCount, tableSetGridlines, tableSetPadding, tableSetTextDirection, tableSplitCells,
 } from '@/embed/table-ui-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
@@ -2442,6 +2442,11 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return tableSetStyle(inputHandler, req);
+    },
+    async tableSetCellPhases(req) {
+      await initPromise;
+      if (!inputHandler) return { ok: false };
+      return tableSetCellPhases(inputHandler, req);
     },
     async pageSetFill(req) {
       await initPromise;
