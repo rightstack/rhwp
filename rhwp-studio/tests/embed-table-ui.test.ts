@@ -190,3 +190,37 @@ test('[lily 2] 열 너비 · 그려진 행 높이 · 쪽마다 꼴', () => {
   assert.deepEqual([g[0]!.first, g[0]!.last, g[1]!.first, g[1]!.last], [true, false, false, true]);
   assert.deepEqual([g[0]!.bodyLeft, g[0]!.bodyRight, g[0]!.pageWidth], [57, 737, 794]);
 });
+
+test('[lily 3] 표 스타일: 카드 + 옵션 → 칸 꼴(lily-docs 견본과 같은 차례) · 빠진 부분 기본 · 표지 왕복', async () => {
+  const { cellLook, effectiveCard, descriptionOfStyle, styleOfDescription, LILY_TABLE_GRID, HEADER_ONLY, parseStyle } = await import('../src/embed/table-style-ops.ts');
+  const lily = { card: LILY_TABLE_GRID, look: HEADER_ONLY };
+  // 새 표 = 제목 행만: 첫 행 F2F2F2 + 굵게, 나머지 바탕 없음, 모든 변 검정
+  const blk = { type: 1, color: '000000' };
+  assert.deepEqual(cellLook(lily, 0, 1, 1, 1, 4, 3), { fill: 'F2F2F2', bold: true, color: null, top: blk, bottom: blk, left: blk, right: blk });
+  assert.deepEqual(cellLook(lily, 2, 1, 1, 1, 4, 3), { fill: null, bold: false, color: null, top: blk, bottom: blk, left: blk, right: blk });
+  // 요약 행 · 줄무늬 행: 끝 행 굵게 + 위 이중선(바로 위 행 아래도), 줄무늬는 제목 행 다음부터 하나 걸러
+  const all = { card: LILY_TABLE_GRID, look: { ...HEADER_ONLY, totalRow: true, bandedRows: true } };
+  assert.equal(cellLook(all, 1, 1, 1, 1, 5, 3).fill, 'F5F5F5');
+  assert.equal(cellLook(all, 2, 1, 1, 1, 5, 3).fill, null);
+  assert.deepEqual([cellLook(all, 4, 1, 1, 1, 5, 3).bold, cellLook(all, 4, 1, 1, 1, 5, 3).top.type, cellLook(all, 3, 1, 1, 1, 5, 3).bottom.type], [true, 8, 8]);
+  // 줄무늬 행이 줄무늬 열보다 앞선다 · 요약 행에도 줄무늬 열
+  const both = { card: LILY_TABLE_GRID, look: { ...HEADER_ONLY, totalRow: true, bandedRows: true, bandedColumns: true } };
+  assert.equal(cellLook({ ...both, card: { ...LILY_TABLE_GRID, band: 'AAAAAA', bandCol: 'BBBBBB' } }, 1, 0, 1, 1, 5, 3).fill, 'AAAAAA');
+  assert.equal(cellLook({ ...both, card: { ...LILY_TABLE_GRID, band: 'AAAAAA', bandCol: 'BBBBBB' } }, 4, 0, 1, 1, 5, 3).fill, 'BBBBBB');
+  // List Table 3: 바깥 테두리만, 요약 행 위 = 카드 색 실선 / 요약 행 선이 없는 카드에 켜면 검정 이중선
+  const list = { card: { id: 'ListTable3AccentBlue', border: '156082', header: '156082', headerBold: true, totalRule: true, outerOnly: true }, look: { ...HEADER_ONLY, totalRow: true } };
+  assert.deepEqual([cellLook(list, 1, 1, 1, 1, 4, 3).left.type, cellLook(list, 1, 0, 1, 1, 4, 3).left.type, cellLook(list, 3, 1, 1, 1, 4, 3).top], [0, 1, { type: 1, color: '156082' }]);
+  assert.deepEqual(cellLook({ card: { id: 'GridTable4AccentBlue', border: 'C1E4F5' }, look: { ...HEADER_ONLY, totalRow: true } }, 3, 1, 1, 1, 4, 3).top, { type: 8, color: '000000' });
+  // 제목 행 글자 색 · 카드 테두리 색(Grid Table 4 Accent Blue)
+  const blue = { card: { id: 'GridTable4AccentBlue', header: '156082', headerBold: true, headerColor: 'FFFFFF', band: 'C1E4F5', border: 'C1E4F5', firstColBold: true }, look: { ...HEADER_ONLY, bandedRows: true } };
+  const lb = { type: 1, color: 'C1E4F5' };
+  assert.deepEqual(cellLook(blue, 0, 0, 1, 1, 3, 3), { fill: '156082', bold: true, color: 'FFFFFF', top: lb, bottom: lb, left: lb, right: lb });
+  // 카드에 없는 부분을 켜면 기본(Table Grid + 제목 행 = F2F2F2 굵게)
+  assert.deepEqual(effectiveCard({ id: 'TableGrid' }, HEADER_ONLY), { id: 'TableGrid', header: 'F2F2F2', headerBold: true });
+  // 스타일 없음 = 꾸밈 · 테두리 없음
+  assert.equal(cellLook({ card: null, look: HEADER_ONLY }, 0, 0, 1, 1, 2, 2).top.type, 0);
+  // 설명문 표지 왕복 · 남의 설명문은 무시
+  assert.deepEqual(styleOfDescription(descriptionOfStyle(blue)), parseStyle(blue));
+  assert.equal(styleOfDescription('개체 설명'), null);
+  assert.throws(() => parseStyle({ card: { id: 'x', header: 'red' }, look: HEADER_ONLY }));
+});

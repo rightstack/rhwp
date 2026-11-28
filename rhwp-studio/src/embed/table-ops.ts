@@ -18,6 +18,7 @@
  * [lily] 제목 줄(2026-11-27): `headerRow: true` = 첫 행 칸을 제목 칸으로 + 표의 제목 줄 자동 반복(표 › 셀 속성 대화 상자의 두 칸,
  * `table.setHeaderRow` 와 같은 값) — 표 만들기와 같은 snapshot(실행 취소 한 단계).
  */
+import { applyStyle, parseStyle, type EmbedTableStyleV1 } from './table-style-ops.ts';
 import type { InputHandler } from '../engine/input-handler.ts';
 import type { WasmBridge } from '../core/wasm-bridge.ts';
 
@@ -58,6 +59,8 @@ export interface EmbedTableInsertV1 {
   cellPaddingMm?: EmbedCellPaddingV1;
   /** 첫 행 = 제목 칸 + 쪽마다 제목 줄 반복 */
   headerRow?: boolean;
+  /** [lily 3] 표 스타일(table-style-ops.ts — lily-docs 표 스타일 카드 + 옵션). 칸 꾸밈 · 설명문 표지를 표 만들기와 같은 snapshot 에 */
+  style?: EmbedTableStyleV1;
 }
 
 /** 칸 안 여백(mm, 0–50) */
@@ -174,7 +177,8 @@ export function parseTableInsert(value: Record<string, unknown>): EmbedTableInse
   const cellPaddingMm = parsePadding(value.cellPaddingMm);
   if (value.headerRow !== undefined && typeof value.headerRow !== 'boolean') throw new Error('headerRow must be true or false');
   const headerRow = value.headerRow === true;
-  const look = { ...(widthsMm && { widthsMm }), ...(heightsMm && { heightsMm }), ...(format && { format }), ...(cellPaddingMm && { cellPaddingMm }), ...(headerRow && { headerRow }) };
+  const style = value.style === undefined ? undefined : parseStyle(value.style);
+  const look = { ...(widthsMm && { widthsMm }), ...(heightsMm && { heightsMm }), ...(format && { format }), ...(cellPaddingMm && { cellPaddingMm }), ...(headerRow && { headerRow }), ...(style && { style }) };
   if (value.cells === undefined) return { rows, cols, ...look };
   if (!Array.isArray(value.cells) || value.cells.length > rows) throw new Error(`cells must be an array of at most ${rows} rows`);
   const cells = value.cells.map((row, r) => {
@@ -269,6 +273,8 @@ export function insertTableAtCaret(ih: InputHandler, req: EmbedTableInsertV1): E
         for (let ci = 0; ci < req.cols; ci += 1) wasm.setCellProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, ci, { isHeader: true });
         wasm.setTableProperties(pos.sectionIndex, r.paraIdx, r.controlIdx, { repeatHeader: true });
       }
+      // [lily 3] 표 스타일(칸 바탕 · 테두리 · 굵게 · 글자 색 + 설명문 표지) — format 뒤라 같은 칸의 format 바탕 · 테두리 · 굵게 · 색은 스타일이 덮는다
+      if (req.style) applyStyle(wasm, { sec: pos.sectionIndex, ppi: r.paraIdx, ci: r.controlIdx }, req.style, 'all');
       // 캐럿은 표 다음 본문 문단의 처음 — 호스트가 이어서 글을 넣을 자리
       return { sectionIndex: pos.sectionIndex, paragraphIndex: r.paraIdx + 1, charOffset: 0 };
     },

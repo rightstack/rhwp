@@ -802,16 +802,14 @@ pub(crate) fn render_transparent_borders(
             } else if let Some(start) = seg_start {
                 let x1 = table_x + ref_cx[start];
                 let x2 = table_x + ref_cx[ci];
-                nodes.extend(transparent_dots(tree, color, width, x1, y, x2, y,
-                ));
+                nodes.extend(transparent_dots(tree, color, width, x1, y, x2, y));
                 seg_start = None;
             }
         }
         if let Some(start) = seg_start {
             let x1 = table_x + ref_cx[start];
             let x2 = table_x + ref_cx.get(h_row.len()).copied().unwrap_or(ref_cx[start]);
-            nodes.extend(transparent_dots(tree, color, width, x1, y, x2, y,
-            ));
+            nodes.extend(transparent_dots(tree, color, width, x1, y, x2, y));
         }
     }
 
@@ -834,24 +832,21 @@ pub(crate) fn render_transparent_borders(
                     // x가 바뀌면 이전 세그먼트 마무리 후 새 세그먼트 시작
                     let y1 = table_y + row_y[seg_start.unwrap()];
                     let y2 = table_y + row_y[ri];
-                    nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2,
-                    ));
+                    nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2));
                     seg_start = Some(ri);
                     seg_x = x;
                 }
             } else if let Some(start) = seg_start {
                 let y1 = table_y + row_y[start];
                 let y2 = table_y + row_y[ri];
-                nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2,
-                ));
+                nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2));
                 seg_start = None;
             }
         }
         if let Some(start) = seg_start {
             let y1 = table_y + row_y[start];
             let y2 = table_y + row_y.get(v_col.len()).copied().unwrap_or(row_y[start]);
-            nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2,
-            ));
+            nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2));
         }
     }
 
@@ -874,7 +869,11 @@ fn transparent_dots(
     const PERIOD: f64 = 3.0;
     const MAX_DOTS: f64 = 2000.0;
     let horiz = (y1 - y2).abs() < 0.01;
-    let (lo, hi) = if horiz { (x1.min(x2), x1.max(x2)) } else { (y1.min(y2), y1.max(y2)) };
+    let (lo, hi) = if horiz {
+        (x1.min(x2), x1.max(x2))
+    } else {
+        (y1.min(y2), y1.max(y2))
+    };
     if !(lo.is_finite() && hi.is_finite()) || (hi - lo) / PERIOD > MAX_DOTS {
         return create_editor_only_line(tree, color, width, StrokeDash::Dot, x1, y1, x2, y2);
     }

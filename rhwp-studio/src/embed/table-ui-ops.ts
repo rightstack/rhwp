@@ -14,6 +14,7 @@
 import type { InputHandler } from '../engine/input-handler.ts';
 import type { WasmBridge } from '../core/wasm-bridge.ts';
 import type { CellBbox, DocumentPosition } from '../core/types.ts';
+import { HEADER_ONLY, LILY_TABLE_GRID, applyStyle, parseStyle, readStyle, restyleAfter, type EmbedTableStyleV1 } from './table-style-ops.ts';
 
 export interface EmbedTableRefV1 { sec: number; ppi: number; ci: number }
 /** 쪽 위 사각형 [쪽, x, y, w, h] — 쪽 좌표(확대 1 의 px) */
@@ -86,6 +87,8 @@ export interface EmbedTableStateV1 {
   gridlines: boolean;
   /** [lily 2] 고른 칸(없으면 캐럿 칸)의 크기 · 표 안 여백 · 글 방향(속성 패널 레이아웃 갈래) */
   size: EmbedTableSizeV1;
+  /** [lily 3] 표 스타일(개체 설명문 표지 — table-style-ops.ts). 우리 표지가 없으면 null */
+  style: EmbedTableStyleV1 | null;
 }
 
 /** [lily 2] 한 쪽에 그려진 표 조각의 꼴 */
@@ -491,6 +494,7 @@ export function tableState(ih: InputHandler, wasm: WasmBridge): EmbedTableStateV
     grids: pageGridsOf(wasm, cells, d.rows, d.cols),
     gridlines,
     size: sizeState(wasm, ref, uniq, cells, r, propOf, fp),
+    style: readStyle(wasm, ref),
   };
 }
 
@@ -753,6 +757,7 @@ export function tableSetCount(ih: InputHandler, wasm: WasmBridge, req: EmbedSetC
         else w.deleteTableColumn(req.sec, req.ppi, req.ci, k);
       }
       if (req.axis === 'col') keepWidth(w, req, before);
+      restyleAfter(w, req);
       ok = true;
       const nd = dims(w, req);
       const cells = cellsOf(w, req);
@@ -890,6 +895,7 @@ export function tableSplitCells(ih: InputHandler, wasm: WasmBridge, req: EmbedSp
       } else {
         ok = w.splitTableCellInto(ref.sec, ref.ppi, ref.ci, r.r0, r.c0, req.rows, req.cols, true, false).ok;
       }
+      if (ok) restyleAfter(w, ref);
       const at = cellAt(cellsOf(w, ref), r.r0, r.c0);
       return at ? cellPos(ref, at.cellIdx) : ih.getCursorPosition();
     },
@@ -898,15 +904,20 @@ export function tableSplitCells(ih: InputHandler, wasm: WasmBridge, req: EmbedSp
   return { ok };
 }
 
-/** 새 표의 꼴(LilyOffice 에이치독스 table-ui/defaults.ts 와 같은 값) — 원래대로 */
-const RESET_LINE = { type: 1, width: 1, color: '#000000' };
-const RESET_HEADER_FILL = '#f2f2f2';
-const RESET_SIZE = 1100; // 11pt
 /**
- * 표 꾸밈을 새 표처럼(lily-docs 표 스타일 원래대로와 같은 일): 칸 바탕 없앰 · 제목 줄이면 첫 행 옅은 회색 + 굵게, 모든 테두리 = 실선 0.12mm 검정,
- * 글자 = 11pt · 검정 · 굵게 · 기울임 · 밑줄 · 취소선 없음(제목 행은 굵게). 글꼴 · 문단 모양 · 칸 크기는 그대로. 실행 취소 한 단계
+ * [lily 3] 표 스타일 원래대로(lily-docs 와 같은 일): 기본 "Lily Table Grid" + 제목 행만 + 표 안 글자 꾸밈 지우기(11pt · 굵게 · 기울임 · 밑줄 · 취소선 · 색) — 실행 취소 한 단계
  */
 export function tableResetStyle(ih: InputHandler): { ok: boolean } {
+  return tableSetStyle(ih, { style: { card: LILY_TABLE_GRID, look: HEADER_ONLY }, clearText: true });
+}
+
+export interface EmbedSetStyleV1 { style: EmbedTableStyleV1; clearText?: boolean }
+export function parseSetStyle(p: Record<string, unknown>): EmbedSetStyleV1 {
+  if (p.clearText !== undefined && typeof p.clearText !== 'boolean') throw new Error('clearText must be true or false');
+  return { style: parseStyle(p.style), ...(p.clearText === true && { clearText: true }) };
+}
+/** [lily 3] 표 스타일 · 스타일 옵션(lily-docs 갤러리 카드 + look) — 칸마다 직접 꾸밈 + 설명문 표지, 실행 취소 한 단계 */
+export function tableSetStyle(ih: InputHandler, req: EmbedSetStyleV1): { ok: boolean } {
   const cur = currentTable(ih);
   if (!cur) return { ok: false };
   const { ref } = cur;
@@ -915,28 +926,8 @@ export function tableResetStyle(ih: InputHandler): { ok: boolean } {
     kind: 'snapshot',
     operationType: 'cellBorderFill',
     operation: (w) => {
-      let header = false;
-      try { header = !!w.getTableProperties(ref.sec, ref.ppi, ref.ci).repeatHeader; } catch { /* 모름 */ }
-      w.runInBatch(() => {
-        for (const b of dedupe(cellsOf(w, ref))) {
-          const head = header && b.row === 0;
-          w.setCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx, {
-            ...(head ? { fillType: 'solid', fillColor: RESET_HEADER_FILL } : { fillType: 'none' }),
-            borderLeft: RESET_LINE, borderRight: RESET_LINE, borderTop: RESET_LINE, borderBottom: RESET_LINE,
-          } as never);
-          let n = 1;
-          try { n = w.getCellParagraphCount(ref.sec, ref.ppi, ref.ci, b.cellIdx); } catch { n = 1; }
-          for (let p = 0; p < n; p += 1) {
-            let len = 0;
-            try { len = w.getCellParagraphLength(ref.sec, ref.ppi, ref.ci, b.cellIdx, p); } catch { len = 0; }
-            w.applyCharFormatInCell(ref.sec, ref.ppi, ref.ci, b.cellIdx, p, 0, len, JSON.stringify({
-              fontSize: RESET_SIZE, bold: head, italic: false, underline: false, strikethrough: false, textColor: '#000000',
-            }));
-          }
-        }
-      });
-      ok = true;
-      return ih.getCursorPosition();
+      ok = applyStyle(w, ref, req.style, 'all', req.clearText);
+      return ok ? ih.getCursorPosition() : null;
     },
   });
   return { ok };
@@ -1017,6 +1008,8 @@ export function tableInsertAt(ih: InputHandler, req: EmbedTableRefV1 & { axis: '
           });
         }
       }
+      // [lily 3] 스타일 표지가 있으면 새 줄 수로 다시 꾸민다(요약 행 · 줄무늬 · 마지막 열)
+      restyleAfter(wasm, req, req.axis === 'row' ? { rows: [req.line] } : { cols: [req.line] });
       const cells = cellsOf(wasm, req);
       out.rects = bandRectsOf(cells, req.axis, req.line, req.line);
       const first = req.axis === 'row' ? cellAt(cells, req.line, 0) : cellAt(cells, 0, req.line);
@@ -1053,6 +1046,7 @@ export function tableDeleteLines(ih: InputHandler, wasm: WasmBridge, req: { what
       if (req.what === 'rows') for (let i = r.r1; i >= r.r0; i -= 1) w.deleteTableRow(ref.sec, ref.ppi, ref.ci, i);
       else for (let i = r.c1; i >= r.c0; i -= 1) w.deleteTableColumn(ref.sec, ref.ppi, ref.ci, i);
       if (req.what === 'cols') keepWidth(w, ref, before);
+      restyleAfter(w, ref);
       ok = true;
       const nd = dims(w, ref);
       const cells = cellsOf(w, ref);
@@ -1087,6 +1081,7 @@ export function tableMove(ih: InputHandler, wasm: WasmBridge, req: EmbedTableRef
       } catch {
         return null;
       }
+      restyleAfter(w, req, req.axis === 'row' ? { rows: [req.from, to] } : { cols: [req.from, to] });
       const cells = cellsOf(w, req);
       const first = req.axis === 'row' ? cellAt(cells, to, 0) : cellAt(cells, 0, to);
       return first ? cellPos(req, first.cellIdx) : ih.getCursorPosition();

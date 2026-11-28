@@ -5342,7 +5342,33 @@ impl HwpDocument {
     /// [lily] 문서 테마 바꾸기: 테마 책갈피 + 박힌 색 옮기기(`map_json` = {"RRGGBB": "RRGGBB"}).
     #[wasm_bindgen(js_name = lilyThemeSet)]
     pub fn lily_theme_set_api(&mut self, name: &str, map_json: &str) -> Result<String, JsValue> {
-        self.lily_theme_set_native(name, map_json).map_err(|e| e.into())
+        self.lily_theme_set_native(name, map_json)
+            .map_err(|e| e.into())
+    }
+
+    /// [lily] 표 개체 설명문(호스트 표 스타일 기억): `{"description": string}`.
+    #[wasm_bindgen(js_name = lilyTableDescription)]
+    pub fn lily_table_description_api(
+        &self,
+        sec: u32,
+        ppi: u32,
+        ci: u32,
+    ) -> Result<String, JsValue> {
+        self.lily_table_description_native(sec as usize, ppi as usize, ci as usize)
+            .map_err(|e| e.into())
+    }
+
+    /// [lily] 표 개체 설명문 바꾸기(hwp · hwpx 저장에 실린다).
+    #[wasm_bindgen(js_name = lilySetTableDescription)]
+    pub fn lily_set_table_description_api(
+        &mut self,
+        sec: u32,
+        ppi: u32,
+        ci: u32,
+        text: &str,
+    ) -> Result<String, JsValue> {
+        self.lily_set_table_description_native(sec as usize, ppi as usize, ci as usize, text)
+            .map_err(|e| e.into())
     }
 
     /// [lily] 도형 꾸밈(채우기 · 선 · 그림자, 묶음이면 안의 개체 모두)을 바꾼다.

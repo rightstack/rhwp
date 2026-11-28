@@ -28,7 +28,8 @@ import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoIns
 import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
 import {
   parseBandRects, parseCellAlign, parseDeleteLines, parseGridAt, parseHeaderRow, parseInsertAt, parseMove, parseSelect, parseSetBorders,
-  parseCellSize, parseGridlines, parsePadding, parseResizeLine, parseResizeTable, parseSetCount, parseSplitCells, parseTextDirection,
+  parseCellSize, parseGridlines, parsePadding, parseResizeLine, parseResizeTable, parseSetCount, parseSetStyle, parseSplitCells, parseTextDirection,
+  type EmbedSetStyleV1,
   type EmbedCellHAlignV1, type EmbedCellSizeV1, type EmbedPaddingV1, type EmbedPageRectV1, type EmbedResizeLineV1, type EmbedResizeTableV1, type EmbedSetBordersV1,
   type EmbedSetCountV1, type EmbedSplitCellsV1, type EmbedTableGridV1, type EmbedTableRefV1, type EmbedTableStateV1,
 } from './table-ui-ops.ts';
@@ -171,6 +172,8 @@ export interface EmbedRpcHandlers {
   tableSetTextDirection(req: { dir: 'horizontal' | 'vertical' }): Promise<{ ok: boolean }>;
   tableSplitCells(req: EmbedSplitCellsV1): Promise<{ ok: boolean }>;
   tableResetStyle(): Promise<{ ok: boolean }>;
+  /** [lily 3] 표 스타일 · 스타일 옵션(칸마다 직접 꾸밈 + 설명문 표지) */
+  tableSetStyle(req: EmbedSetStyleV1): Promise<{ ok: boolean }>;
   shapeInsert(req: EmbedShapeInsertV1): Promise<EmbedPageOpResultV1>;
   /** [lily] 차트(그림 + 설명에 실은 정의) 넣기 · 고른 차트 읽기 · 바꾸기 */
   pictureInsert(req: EmbedPictureInsertV1): Promise<EmbedPictureInsertResultV1>;
@@ -460,7 +463,7 @@ export async function routeEmbedRequest(
       assertOnlyKeys(params, ['fieldId', 'name', 'occurrence', 'value'], 'field.set params');
       return handlers.fieldSet(parseFieldSet(params));
     case 'table.insert':
-      assertOnlyKeys(params, ['rows', 'cols', 'cells', 'widthsMm', 'heightsMm', 'format', 'cellPaddingMm', 'headerRow'], 'table.insert params');
+      assertOnlyKeys(params, ['rows', 'cols', 'cells', 'widthsMm', 'heightsMm', 'format', 'cellPaddingMm', 'headerRow', 'style'], 'table.insert params');
       return handlers.tableInsert(parseTableInsert(params));
     case 'table.cellFill':
       assertOnlyKeys(params, [], 'table.cellFill params');
@@ -525,6 +528,9 @@ export async function routeEmbedRequest(
     case 'table.resetStyle':
       assertOnlyKeys(params, [], 'table.resetStyle params');
       return handlers.tableResetStyle();
+    case 'table.setStyle':
+      assertOnlyKeys(params, ['style', 'clearText'], 'table.setStyle params');
+      return handlers.tableSetStyle(parseSetStyle(params));
     case 'page.setFill':
       assertOnlyKeys(params, ['color'], 'page.setFill params');
       return handlers.pageSetFill(parsePageFill(params));

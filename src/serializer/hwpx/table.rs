@@ -106,6 +106,10 @@ pub fn write_table<W: Write>(
     if let Some(caption) = &table.caption {
         write_caption(w, caption, ctx)?;
     }
+    // [lily] 개체 설명문(OWPML 자식 순서 caption 다음) — 빈 설명문은 쓰지 않는다
+    if !table.common.description.is_empty() {
+        write_table_shape_comment(w, &table.common.description)?;
+    }
     write_in_margin(w, table)?;
     // cellzoneList: inMargin 다음, tr 앞 (OWPML 자식 순서). 셀 영역 테두리/배경
     // 오버레이를 정의한다. 파서가 table.zones 로 보존하므로 그대로 되살린다.
@@ -203,6 +207,19 @@ fn write_pos<W: Write>(w: &mut Writer<W>, c: &CommonObjAttr) -> Result<(), Seria
             ("horzOffset", &horz_offset),
         ],
     )
+}
+
+/// [lily] `<hp:shapeComment>` — 표 개체 설명문(LilyOffice 에이치독스 표 스타일 기억, `object_ops/lily_table.rs`)
+fn write_table_shape_comment<W: Write>(
+    w: &mut Writer<W>,
+    text: &str,
+) -> Result<(), SerializeError> {
+    start_tag(w, "hp:shapeComment")?;
+    w.write_event(quick_xml::events::Event::Text(
+        quick_xml::events::BytesText::new(text),
+    ))
+    .map_err(|e| SerializeError::XmlError(e.to_string()))?;
+    end_tag(w, "hp:shapeComment")
 }
 
 fn write_out_margin<W: Write>(w: &mut Writer<W>, t: &Table) -> Result<(), SerializeError> {

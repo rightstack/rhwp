@@ -33,7 +33,16 @@ export interface RhwpTableState {
     rowHeightMm: number | null; rowHeightLaidMm: number | null; colWidthMm: number | null;
     padding: { top: number; bottom: number; left: number; right: number }; textDirection: 'horizontal' | 'vertical';
   };
+  /** [lily 3] 표 스타일 표지(없으면 null) */
+  style: RhwpTableStyle | null;
 }
+/** [lily 3] 표 스타일 카드(lily-docs 브리지 table_styles 카드와 같은 모양, 색 = RRGGBB) · 옵션 */
+export interface RhwpTableStyleCard {
+  id: string; name?: string; header?: string | null; headerBold?: boolean; headerColor?: string | null; fill?: string | null; band?: string | null; bandCol?: string | null;
+  total?: string | null; totalBold?: boolean; totalRule?: boolean; firstCol?: string | null; firstColBold?: boolean; lastCol?: string | null; lastColBold?: boolean; border?: string | null; outerOnly?: boolean;
+}
+export interface RhwpTableLook { headerRow: boolean; firstColumn: boolean; totalRow: boolean; lastColumn: boolean; bandedRows: boolean; bandedColumns: boolean }
+export interface RhwpTableStyle { card: RhwpTableStyleCard | null; look: RhwpTableLook }
 /** [lily 2] 한 쪽에 그려진 표 조각(쪽 좌표) */
 export interface RhwpTablePageGrid {
   page: number; pageWidth: number; left: number; top: number; right: number; bottom: number;
@@ -500,6 +509,8 @@ export declare class RhwpEditor {
       cellPaddingMm?: { top?: number; bottom?: number; left?: number; right?: number };
       /** [lily] 첫 행 = 제목 칸 + 쪽마다 제목 줄 반복(표 만들기와 같은 실행 취소 단계) */
       headerRow?: boolean;
+      /** [lily 3] 표 스타일(칸 꾸밈 + 설명문 표지, 같은 실행 취소 단계) */
+      style?: RhwpTableStyle;
     }): Promise<{ ok: boolean; paragraph?: number; rows?: number; cols?: number }>;
     /** [lily] 캐럿 칸의 바탕색(#rrggbb, 없으면 null). 표 밖(또는 칸 안의 표)이면 inTable: false */
     cellFill(): Promise<{ inTable: boolean; color: string | null }>;
@@ -543,6 +554,8 @@ export declare class RhwpEditor {
     splitCells(req: { rows: number; cols: number; mergeFirst: boolean }): Promise<{ ok: boolean }>;
     /** [lily 2] 표 꾸밈을 새 표처럼(바탕 · 테두리 · 글자) */
     resetStyle(): Promise<{ ok: boolean }>;
+    /** [lily 3] 표 스타일(카드 null = 스타일 없음) · 옵션 여섯 — 칸마다 꾸밈 + 표 개체 설명문 `lily-table-style:` 표지(hwp · hwpx 저장에 실린다) */
+    setStyle(req: { style: RhwpTableStyle; clearText?: boolean }): Promise<{ ok: boolean }>;
   };
 
   /** 본문 위치에 글 넣기(`\n` = 문단 나누기, 실행 취소 한 단계). 좌표가 본문 문단 밖이면 ok: false.

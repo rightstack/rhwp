@@ -2360,6 +2360,10 @@ fn parse_table(
                         let caption = parse_caption(ce, reader)?;
                         table.caption = Some(caption);
                     }
+                    // [lily] 표 개체 설명문(그림 · 도형과 같은 shapeComment)
+                    b"shapeComment" => {
+                        table.common.description = read_dutmal_text(reader, b"shapeComment")?;
+                    }
                     _ => {}
                 }
             }

@@ -624,6 +624,8 @@ export class RhwpEditor {
       setTextDirection: (req) => this._request('table.setTextDirection', req),
       splitCells: (req) => this._request('table.splitCells', req),
       resetStyle: () => this._request('table.resetStyle', {}),
+      // [lily 3] 표 스타일(lily-docs 카드 + 옵션 여섯) — 칸마다 직접 꾸밈 + 표 개체 설명문 표지
+      setStyle: (req) => this._request('table.setStyle', req),
     };
   }
 
