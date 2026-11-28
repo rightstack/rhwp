@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 import { routeEmbedRequest, type EmbedRpcHandlers } from '../src/embed/rpc-router.ts';
 import {
-  bandRectsOf, bordersState, framesOf, gridOfCells, moveBlocked, ptOfWidthIdx, sidesFor, widthIdxOfPt,
+  bandRectsOf, bordersState, columnWidths, framesOf, gridOfCells, laidRowHeights, moveBlocked, pageGridsOf, ptOfWidthIdx, resizedColumns, sidesFor, widthIdxOfPt,
 } from '../src/embed/table-ui-ops.ts';
 
 /** 쪽 0 의 rows × cols 칸(칸 100×20, 표 왼쪽 위 = 50,40) */
@@ -116,4 +116,77 @@ test('[lily] 합친 칸이 걸린 행·열 옮기기는 막는다', () => {
   assert.equal(moveBlocked(merged, 'row', 0, 3), true);
   assert.equal(moveBlocked(merged, 'row', 0, 1), false); // 제자리
   assert.equal(moveBlocked(merged, 'col', 0, 2), false);
+});
+
+test('[lily 2] 새 table.* (수 칸 · 경계 끌기 · 표 크기 · 투명 선 · 셀 크기 · 여백 · 글 방향 · 나누기 · 원래대로) 인자 검증', async () => {
+  const calls: unknown[] = [];
+  const rec = (name: string) => async (r?: unknown) => { calls.push([name, r]); return { ok: true }; };
+  const handlers = {
+    tableSetCount: rec('setCount'), tableResizeLine: rec('resizeLine'), tableResize: rec('resize'), tableSetGridlines: rec('gridlines'),
+    tableSetCellSize: rec('cellSize'), tableSetPadding: rec('padding'), tableSetTextDirection: rec('dir'), tableSplitCells: rec('split'),
+    tableResetStyle: rec('reset'), tableSetCellAlign: rec('align'),
+  } as unknown as EmbedRpcHandlers;
+  const ref = { sec: 0, ppi: 1, ci: 0 };
+  await routeEmbedRequest('table.setCount', { ...ref, axis: 'col', n: 5 }, handlers);
+  await routeEmbedRequest('table.resizeLine', { ...ref, axis: 'col', line: 1, deltaPx: -12.5 }, handlers);
+  await routeEmbedRequest('table.resize', { ...ref, page: 0, widthPx: 300, heightPx: 80 }, handlers);
+  await routeEmbedRequest('table.setGridlines', { on: true }, handlers);
+  await routeEmbedRequest('table.setCellSize', { rowHeightMm: 10 }, handlers);
+  await routeEmbedRequest('table.setPadding', { top: 2, left: 1.8 }, handlers);
+  await routeEmbedRequest('table.setTextDirection', { dir: 'vertical' }, handlers);
+  await routeEmbedRequest('table.splitCells', { rows: 1, cols: 2, mergeFirst: true }, handlers);
+  await routeEmbedRequest('table.resetStyle', {}, handlers);
+  await routeEmbedRequest('table.setCellAlign', { v: 'bottom', h: 'right' }, handlers);
+  assert.deepEqual(calls, [
+    ['setCount', { ...ref, axis: 'col', n: 5 }],
+    ['resizeLine', { ...ref, axis: 'col', line: 1, deltaPx: -12.5, mode: 'share' }],
+    ['resize', { ...ref, page: 0, widthPx: 300, heightPx: 80 }],
+    ['gridlines', { on: true }],
+    ['cellSize', { rowHeightMm: 10 }],
+    ['padding', { top: 2, left: 1.8 }],
+    ['dir', { dir: 'vertical' }],
+    ['split', { rows: 1, cols: 2, mergeFirst: true }],
+    ['reset', undefined],
+    ['align', { v: 'bottom', h: 'right' }],
+  ]);
+  await assert.rejects(routeEmbedRequest('table.setCount', { ...ref, axis: 'col', n: 0 }, handlers));
+  await assert.rejects(routeEmbedRequest('table.setCount', { ...ref, axis: 'col', n: 64 }, handlers));
+  await assert.rejects(routeEmbedRequest('table.resizeLine', { ...ref, axis: 'col', line: 1, deltaPx: 3, mode: 'grow' }, handlers));
+  await assert.rejects(routeEmbedRequest('table.resize', { ...ref, page: 0, widthPx: 0, heightPx: 10 }, handlers));
+  await assert.rejects(routeEmbedRequest('table.setCellSize', {}, handlers));
+  await assert.rejects(routeEmbedRequest('table.setPadding', { top: -1 }, handlers));
+  await assert.rejects(routeEmbedRequest('table.setCellAlign', { h: 'middle' }, handlers));
+  await assert.rejects(routeEmbedRequest('table.setCellAlign', {}, handlers));
+});
+
+test('[lily 2] 열 경계 끌기: 이웃이 메움(표 너비 그대로) · 왼쪽 열만 · 비율 · 하한', () => {
+  const cols = [3000, 3000, 3000];
+  assert.deepEqual(resizedColumns(cols, 1, 750, 'share'), [3750, 2250, 3000]);
+  assert.deepEqual(resizedColumns(cols, 1, 750, 'left'), [3750, 3000, 3000]);
+  const ratio = resizedColumns(cols, 1, 600, 'ratio')!;
+  assert.equal(ratio[0], 3600);
+  assert.equal(Math.round(ratio[1]! + ratio[2]!), 5400);
+  // 오른쪽 끝 경계 = 늘 왼쪽 열만
+  assert.deepEqual(resizedColumns(cols, 3, -500, 'share'), [3000, 3000, 2500]);
+  // 하한 6pt(600): 이웃을 600 아래로 줄이지 않는다
+  assert.deepEqual(resizedColumns(cols, 1, 9999, 'share'), [5400, 600, 3000]);
+  assert.deepEqual(resizedColumns(cols, 1, -9999, 'share'), [600, 5400, 3000]);
+  assert.equal(resizedColumns(cols, 0, 10, 'share'), null);
+});
+
+test('[lily 2] 열 너비 · 그려진 행 높이 · 쪽마다 꼴', () => {
+  const c = cells(3, 2);
+  assert.deepEqual(columnWidths(c, 2, (b) => b.w * 75), [7500, 7500]);
+  const merged = [{ cellIdx: 0, row: 0, col: 0, rowSpan: 1, colSpan: 2, pageIndex: 0, x: 0, y: 0, w: 200, h: 20 }];
+  assert.deepEqual(columnWidths(merged, 2, () => 15000), [7500, 7500]);
+  assert.deepEqual(laidRowHeights(c, 3), [20, 20, 20]);
+  // 행 1 이 두 쪽에 걸쳤다: 조각을 더한다
+  const split = [...cells(2, 1), { cellIdx: 1, row: 1, col: 0, rowSpan: 1, colSpan: 1, pageIndex: 1, x: 50, y: 40, w: 100, h: 15 }];
+  assert.deepEqual(laidRowHeights(split, 2), [20, 35]);
+  const info = { getPageInfo: (p: number) => ({ width: 794, height: 1123, marginLeft: 56 + p, marginRight: 56, bodyLeft: 57, bodyRight: 737 }) };
+  const two = [...cells(1, 2, 0), ...cells(1, 2, 1).map((b) => ({ ...b, cellIdx: b.cellIdx + 2, row: 1 }))];
+  const g = pageGridsOf(info as never, two, 2, 2);
+  assert.equal(g.length, 2);
+  assert.deepEqual([g[0]!.first, g[0]!.last, g[1]!.first, g[1]!.last], [true, false, false, true]);
+  assert.deepEqual([g[0]!.bodyLeft, g[0]!.bodyRight, g[0]!.pageWidth], [57, 737, 794]);
 });

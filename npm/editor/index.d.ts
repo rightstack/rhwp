@@ -11,6 +11,8 @@ export interface RhwpTableGrid {
   left: number; top: number; right: number; bottom: number;
   cell: [number, number, number, number]; cellRow: number; cellCol: number;
   colLines: number[]; rowBands: { row: number; top: number; bottom: number }[]; first: boolean;
+  /** [lily 2] 본문 상자 왼쪽 · 오른쪽(쪽 여백선, px) */
+  bodyLeft?: number; bodyRight?: number;
 }
 export interface RhwpTableState {
   ref: RhwpTableRef; rows: number; cols: number;
@@ -24,6 +26,18 @@ export interface RhwpTableState {
     span: [number, number]; style: string | null; widthPt: number | null; color: string | null;
   };
   headerRow: boolean;
+  /** [lily 2] 표가 그려진 쪽마다의 꼴 · 투명 선 보기 · 고른 칸 크기 */
+  grids: RhwpTablePageGrid[];
+  gridlines: boolean;
+  size: {
+    rowHeightMm: number | null; rowHeightLaidMm: number | null; colWidthMm: number | null;
+    padding: { top: number; bottom: number; left: number; right: number }; textDirection: 'horizontal' | 'vertical';
+  };
+}
+/** [lily 2] 한 쪽에 그려진 표 조각(쪽 좌표) */
+export interface RhwpTablePageGrid {
+  page: number; pageWidth: number; left: number; top: number; right: number; bottom: number;
+  colLines: number[]; rowBands: { row: number; top: number; bottom: number }[]; first: boolean; last: boolean; bodyLeft: number; bodyRight: number;
 }
 
 export interface EditorOptions {
@@ -508,9 +522,27 @@ export declare class RhwpEditor {
     /** [lily] 셀 테두리 여덟(켜기 · 끄기) 또는 restyle — 선 모양(공용 이름) · 굵기 pt · 색 */
     setBorders(req: { kind: 'all' | 'outside' | 'inside' | 'none' | 'top' | 'bottom' | 'left' | 'right' | 'restyle'; on?: boolean; style?: string; widthPt?: number; color?: string | null }): Promise<{ ok: boolean }>;
     /** [lily] 셀 세로 맞춤 */
-    setCellAlign(req: { v: 'top' | 'center' | 'bottom' }): Promise<{ ok: boolean }>;
+    setCellAlign(req: { v?: 'top' | 'center' | 'bottom'; h?: 'left' | 'center' | 'right' | 'justify' }): Promise<{ ok: boolean }>;
     /** [lily] 제목 줄(첫 행 = 제목 칸 + 제목 줄 자동 반복) */
     setHeaderRow(req: { on: boolean }): Promise<{ ok: boolean }>;
+    /** [lily 2] 열 수 · 행 수를 n 으로(끝에서 넣고 뺀다, 열은 표 너비 그대로) — 실행 취소 한 단계 */
+    setCount(req: RhwpTableRef & { axis: 'row' | 'col'; n: number }): Promise<{ ok: boolean; rects?: RhwpPageRect[] }>;
+    /** [lily 2] 열 경계(line ≥ 1) · 행 아래 경계를 deltaPx(쪽 px)만큼 — share 이웃이 메움 · left 왼쪽 열만 · ratio 오른쪽 열 비율 */
+    resizeLine(req: RhwpTableRef & { axis: 'row' | 'col'; line: number; deltaPx: number; mode?: 'share' | 'left' | 'ratio' }): Promise<{ ok: boolean }>;
+    /** [lily 2] 쪽 page 의 표 조각을 widthPx × heightPx 로(열 너비 · 그 쪽 행 높이가 비율대로) */
+    resize(req: RhwpTableRef & { page: number; widthPx: number; heightPx: number }): Promise<{ ok: boolean }>;
+    /** [lily 2] 투명 선(테두리 없는 칸 변의 화면 점선) 보기 — 다음에 여는 문서에도 */
+    setGridlines(req: { on: boolean }): Promise<{ ok: boolean }>;
+    /** [lily 2] 고른 줄의 행 높이 · 열 너비(mm) */
+    setCellSize(req: { rowHeightMm?: number; colWidthMm?: number }): Promise<{ ok: boolean }>;
+    /** [lily 2] 표 안 여백(mm) — 표 + 모든 칸 */
+    setPadding(req: { top?: number; bottom?: number; left?: number; right?: number }): Promise<{ ok: boolean }>;
+    /** [lily 2] 고른 칸의 글 방향 */
+    setTextDirection(req: { dir: 'horizontal' | 'vertical' }): Promise<{ ok: boolean }>;
+    /** [lily 2] 셀 나누기(행 · 열 수, 먼저 합치기) */
+    splitCells(req: { rows: number; cols: number; mergeFirst: boolean }): Promise<{ ok: boolean }>;
+    /** [lily 2] 표 꾸밈을 새 표처럼(바탕 · 테두리 · 글자) */
+    resetStyle(): Promise<{ ok: boolean }>;
   };
 
   /** 본문 위치에 글 넣기(`\n` = 문단 나누기, 실행 취소 한 단계). 좌표가 본문 문단 밖이면 ok: false.

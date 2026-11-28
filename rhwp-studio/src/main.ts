@@ -69,6 +69,7 @@ import { editMemo, insertMemoAtCaret } from '@/embed/memo-ops';
 import { cellFillState, insertTableAtCaret, setCellFill } from '@/embed/table-ops';
 import {
   tableBandRects, tableDeleteLines, tableGridAt, tableInsertAt, tableMove, tableSelect, tableSetBorders, tableSetCellAlign, tableSetHeaderRow, tableState,
+  gridlinesPreference, tableResetStyle, tableResize, tableResizeLine, tableSetCellSize, tableSetCount, tableSetGridlines, tableSetPadding, tableSetTextDirection, tableSplitCells,
 } from '@/embed/table-ui-ops';
 import { insertDecorShape, setPageFill } from '@/embed/page-ops';
 import { insertChart, replaceChart, selectedChart } from '@/embed/chart-ops';
@@ -1448,6 +1449,9 @@ function applySavedTextMarkSettings(): void {
   const clipEnabled = !view.clipView;
   wasm.setClipEnabled(clipEnabled);
   syncClipMenu(clipEnabled);
+  // [lily 2] 호스트가 정한 투명 선 보기(table.setGridlines)는 새로 여는 문서에도
+  const grid = gridlinesPreference();
+  if (grid !== null) wasm.setShowTransparentBorders(grid);
 }
 
 async function initializeDocument(
@@ -2388,6 +2392,51 @@ installEmbedRuntime({
       await initPromise;
       if (!inputHandler || wasm.pageCount === 0) return { ok: false };
       return tableSetHeaderRow(inputHandler, wasm, req);
+    },
+    // [lily 2] 머리 띠 수 칸 · 경계 끌기 · 표 크기 · 투명 선 · 레이아웃 갈래(table-ui-ops.ts)
+    async tableSetCount(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSetCount(inputHandler, wasm, req);
+    },
+    async tableResizeLine(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableResizeLine(inputHandler, req);
+    },
+    async tableResize(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableResize(inputHandler, req);
+    },
+    async tableSetGridlines(req) {
+      await initPromise;
+      return tableSetGridlines(wasm, req, () => eventBus.emit('document-view-changed'));
+    },
+    async tableSetCellSize(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSetCellSize(inputHandler, wasm, req);
+    },
+    async tableSetPadding(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSetPadding(inputHandler, req);
+    },
+    async tableSetTextDirection(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSetTextDirection(inputHandler, wasm, req);
+    },
+    async tableSplitCells(req) {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableSplitCells(inputHandler, wasm, req);
+    },
+    async tableResetStyle() {
+      await initPromise;
+      if (!inputHandler || wasm.pageCount === 0) return { ok: false };
+      return tableResetStyle(inputHandler);
     },
     async pageSetFill(req) {
       await initPromise;

@@ -39,6 +39,9 @@ export interface EmbedTableGridV1 {
   rowBands: { row: number; top: number; bottom: number }[];
   /** 첫 행이 이 쪽에 있다 */
   first: boolean;
+  /** [lily 2] 본문 상자 왼쪽 · 오른쪽(쪽 여백선, px) — 캐럿 없는 표의 경계 끌기 맞춤선 */
+  bodyLeft?: number;
+  bodyRight?: number;
 }
 
 export interface EmbedTableBordersV1 {
@@ -77,6 +80,42 @@ export interface EmbedTableStateV1 {
   borders: EmbedTableBordersV1;
   /** 제목 줄: 첫 행 칸이 모두 제목 칸이고 표가 제목 줄을 자동 반복한다 */
   headerRow: boolean;
+  /** [lily 2] 표가 그려진 쪽마다의 꼴(머리 띠 · 경계 끌기 · 크기 손잡이) — 쪽 좌표 */
+  grids: EmbedTablePageGridV1[];
+  /** [lily 2] 투명 선(테두리 없는 칸 변의 화면 점선) 보기 */
+  gridlines: boolean;
+  /** [lily 2] 고른 칸(없으면 캐럿 칸)의 크기 · 표 안 여백 · 글 방향(속성 패널 레이아웃 갈래) */
+  size: EmbedTableSizeV1;
+}
+
+/** [lily 2] 한 쪽에 그려진 표 조각의 꼴 */
+export interface EmbedTablePageGridV1 {
+  page: number;
+  pageWidth: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  colLines: number[];
+  rowBands: { row: number; top: number; bottom: number }[];
+  /** 첫 행 · 마지막 행이 이 쪽에 있다 */
+  first: boolean;
+  last: boolean;
+  /** 본문 상자 왼쪽 · 오른쪽(쪽 여백선, px) — 표 너비 맞춤선 */
+  bodyLeft: number;
+  bodyRight: number;
+}
+
+/** [lily 2] 크기 값(mm, 고른 줄이 모두 같을 때만 — 아니면 null) */
+export interface EmbedTableSizeV1 {
+  /** 칸에 지정한 높이 */
+  rowHeightMm: number | null;
+  /** 그려진 행 높이(지정 높이보다 글이 길면 더 크다) */
+  rowHeightLaidMm: number | null;
+  colWidthMm: number | null;
+  /** 표 안 여백(표 속성 — 칸마다 따로 준 여백은 그 칸이 이긴다) */
+  padding: { top: number; bottom: number; left: number; right: number };
+  textDirection: 'horizontal' | 'vertical';
 }
 
 // ── 순수 계산(테스트 가능) ──
@@ -278,9 +317,20 @@ export function parseSetBorders(p: Record<string, unknown>): EmbedSetBordersV1 {
   }
   return out;
 }
-export function parseCellAlign(p: Record<string, unknown>): { v: 'top' | 'center' | 'bottom' } {
-  if (p.v !== 'top' && p.v !== 'center' && p.v !== 'bottom') throw new Error('v must be top, center or bottom');
-  return { v: p.v };
+export type EmbedCellHAlignV1 = 'left' | 'center' | 'right' | 'justify';
+export function parseCellAlign(p: Record<string, unknown>): { v?: 'top' | 'center' | 'bottom'; h?: EmbedCellHAlignV1 } {
+  const out: { v?: 'top' | 'center' | 'bottom'; h?: EmbedCellHAlignV1 } = {};
+  if (p.v !== undefined) {
+    if (p.v !== 'top' && p.v !== 'center' && p.v !== 'bottom') throw new Error('v must be top, center or bottom');
+    out.v = p.v;
+  }
+  // [lily 2] 가로 맞춤(칸 안 문단 모두) — 9칸 맞춤이 세로와 함께 한 단계로
+  if (p.h !== undefined) {
+    if (p.h !== 'left' && p.h !== 'center' && p.h !== 'right' && p.h !== 'justify') throw new Error('h must be left, center, right or justify');
+    out.h = p.h;
+  }
+  if (!out.v && !out.h) throw new Error('v must be top, center or bottom');
+  return out;
 }
 export function parseHeaderRow(p: Record<string, unknown>): { on: boolean } {
   if (typeof p.on !== 'boolean') throw new Error('on must be true or false');
@@ -354,7 +404,10 @@ export function tableGridAt(wasm: WasmBridge, at: { page: number; fx: number; fy
   const cell = onPage.find((b) => req.x >= b.x && req.x <= b.x + b.w && req.y >= b.y && req.y <= b.y + b.h);
   const g = gridOfCells(onPage, d.cols);
   if (!cell || !g) return null;
-  return { ref, page: req.page, pageWidth: info.width, rows: d.rows, cols: d.cols, ...g, cell: [cell.x, cell.y, cell.w, cell.h], cellRow: cell.row, cellCol: cell.col };
+  return {
+    ref, page: req.page, pageWidth: info.width, rows: d.rows, cols: d.cols, ...g, cell: [cell.x, cell.y, cell.w, cell.h], cellRow: cell.row, cellCol: cell.col,
+    bodyLeft: info.bodyLeft ?? info.marginLeft, bodyRight: info.bodyRight ?? info.width - info.marginRight,
+  };
 }
 
 /** 캐럿·셀 블록·표 개체 선택이 있는 표(맨 바깥 표만) */
@@ -427,13 +480,466 @@ export function tableState(ih: InputHandler, wasm: WasmBridge): EmbedTableStateV
     const tp = wasm.getTableProperties(ref.sec, ref.ppi, ref.ci);
     headerRow = !!tp.repeatHeader && uniq.filter((b) => b.row === 0).every((b) => propOf(b.cellIdx)?.isHeader);
   } catch { /* 모름 */ }
+  let gridlines = false;
+  try { gridlines = wasm.getShowTransparentBorders(); } catch { /* 모름 */ }
   return {
     ref, rows: d.rows, cols: d.cols,
     caret: caretCell ? { row: caretCell.row, col: caretCell.col } : null,
     sel, objectSelected: cur.object,
     selFrames: framesOf(inRange), tableFrames: framesOf(cells), pageWidths,
     fill, vAlign: V_ALIGN[fp?.verticalAlign ?? 0] ?? 'top', borders, headerRow,
+    grids: pageGridsOf(wasm, cells, d.rows, d.cols),
+    gridlines,
+    size: sizeState(wasm, ref, uniq, cells, r, propOf, fp),
   };
+}
+
+// ── [lily 2] 머리 띠 · 경계 끌기 · 크기 · 레이아웃 갈래(2026-11-28 — lily-docs 표 머리 띠 · 속성 패널을 에이치독스에) ──
+
+const HWP_PER_PX = 75; // 1 쪽 px(96 DPI) = 75 HWPUNIT
+const MM_PER_HWP = 25.4 / 7200;
+const mm2 = (hwp: number) => Math.round(hwp * MM_PER_HWP * 100) / 100;
+const hwpOfMm = (mm: number) => Math.round(mm / MM_PER_HWP);
+
+/** 표가 그려진 쪽마다의 꼴 */
+export function pageGridsOf(wasm: Pick<WasmBridge, 'getPageInfo'>, cells: readonly CellBbox[], rows: number, cols: number): EmbedTablePageGridV1[] {
+  const pages = [...new Set(cells.map((b) => b.pageIndex))].sort((a, b) => a - b);
+  const out: EmbedTablePageGridV1[] = [];
+  for (const page of pages) {
+    const on = cells.filter((b) => b.pageIndex === page);
+    const g = gridOfCells(on, cols);
+    if (!g) continue;
+    let info: { width: number; bodyLeft?: number; bodyRight?: number; marginLeft: number; marginRight: number } | null = null;
+    try { info = wasm.getPageInfo(page); } catch { info = null; }
+    const width = info?.width ?? 0;
+    out.push({
+      page, pageWidth: width, ...g,
+      last: on.some((b) => spanEnd(b.row, b.rowSpan) >= rows - 1),
+      bodyLeft: info ? (info.bodyLeft ?? info.marginLeft) : 0,
+      bodyRight: info ? (info.bodyRight ?? width - info.marginRight) : 0,
+    });
+  }
+  return out;
+}
+
+/** 모두 같은 값이면 그 값, 아니면 null */
+const sameOf = (xs: readonly number[], eps = 1): number | null => (xs.length && xs.every((x) => Math.abs(x - xs[0]!) <= eps) ? xs[0]! : null);
+
+/** 행마다 그려진 높이(px) — 여러 쪽에 걸친 행은 조각을 더한다. 한 칸짜리 칸에서 잰다 */
+export function laidRowHeights(cells: readonly CellBbox[], rows: number): number[] {
+  const out: number[] = [];
+  for (let r = 0; r < rows; r += 1) {
+    const byPage = new Map<number, number>();
+    for (const b of cells) if (b.row === r && Math.max(1, b.rowSpan) === 1) byPage.set(b.pageIndex, Math.max(byPage.get(b.pageIndex) ?? 0, b.h));
+    out.push([...byPage.values()].reduce((a, b) => a + b, 0));
+  }
+  return out;
+}
+
+/** 열 너비(HWPUNIT) — 한 칸짜리 칸의 너비, 모두 합친 열은 그 칸 너비를 나눈다 */
+export function columnWidths(uniq: readonly CellBbox[], cols: number, widthOf: (b: CellBbox) => number): number[] {
+  const w: (number | null)[] = Array.from({ length: cols }, () => null);
+  for (const b of uniq) if (Math.max(1, b.colSpan) === 1 && w[b.col] === null) w[b.col] = widthOf(b);
+  for (const b of uniq) {
+    const span = Math.max(1, b.colSpan);
+    if (span === 1) continue;
+    const idx = Array.from({ length: span }, (_, i) => b.col + i).filter((c) => c < cols);
+    const missing = idx.filter((c) => w[c] === null);
+    if (!missing.length) continue;
+    const known = idx.filter((c) => w[c] !== null).reduce((a, c) => a + w[c]!, 0);
+    const each = Math.max(1, (widthOf(b) - known) / missing.length);
+    for (const c of missing) w[c] = each;
+  }
+  return w.map((x) => x ?? 0);
+}
+
+function sizeState(
+  wasm: WasmBridge, ref: EmbedTableRefV1, uniq: readonly CellBbox[], cells: readonly CellBbox[],
+  r: { r0: number; c0: number; r1: number; c1: number } | null, propOf: (idx: number) => ReturnType<WasmBridge['getCellProperties']> | undefined,
+  fp: ReturnType<WasmBridge['getCellProperties']> | undefined,
+): EmbedTableSizeV1 {
+  const pad = { top: 0, bottom: 0, left: 0, right: 0 };
+  try {
+    const tp = wasm.getTableProperties(ref.sec, ref.ppi, ref.ci);
+    Object.assign(pad, { top: mm2(tp.paddingTop), bottom: mm2(tp.paddingBottom), left: mm2(tp.paddingLeft), right: mm2(tp.paddingRight) });
+  } catch { /* 모름 */ }
+  const rows = r ? uniq.filter((b) => Math.max(1, b.rowSpan) === 1 && b.row >= r.r0 && b.row <= r.r1) : [];
+  const colsIn = r ? uniq.filter((b) => Math.max(1, b.colSpan) === 1 && b.col >= r.c0 && b.col <= r.c1) : [];
+  const declared = sameOf(rows.map((b) => propOf(b.cellIdx)?.height ?? 0).filter((h) => h > 0));
+  const laid = r ? sameOf(laidRowHeights(cells, r.r1 + 1).slice(r.r0, r.r1 + 1), 0.5) : null;
+  const width = sameOf(colsIn.map((b) => propOf(b.cellIdx)?.width ?? 0).filter((w) => w > 0));
+  return {
+    rowHeightMm: declared === null ? null : mm2(declared),
+    rowHeightLaidMm: laid === null ? null : mm2(laid * HWP_PER_PX),
+    colWidthMm: width === null ? null : mm2(width),
+    padding: pad,
+    textDirection: fp?.textDirection === 1 ? 'vertical' : 'horizontal',
+  };
+}
+
+const MIN_COL_HWP = 600; // 6pt — lily-docs 경계 끌기 하한과 같다
+const MIN_ROW_HWP = 300; // 4pt
+
+/**
+ * 열 너비 · 행 높이를 새 값으로(칸마다 그 칸이 걸친 열 · 행의 합) — 엔진 resizeTableCells 한 번(글 다시 흘리기 포함).
+ * `newCols` = 열마다 HWPUNIT(null = 그대로), `newRows` = 바뀐 행만 HWPUNIT(그 행에 걸친 칸만 높이를 다시 정한다, 나머지 행은 그려진 높이).
+ */
+function applySizes(w: WasmBridge, ref: EmbedTableRefV1, newCols: number[] | null, newRows: Map<number, number> | null): boolean {
+  const all = cellsOf(w, ref);
+  const uniq = dedupe(all);
+  const d = dims(w, ref);
+  if (!d) return false;
+  const laid = laidRowHeights(all, d.rows).map((h) => h * HWP_PER_PX);
+  const updates: { cellIdx: number; widthDelta?: number; heightDelta?: number }[] = [];
+  for (const b of uniq) {
+    let p;
+    try { p = w.getCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx); } catch { continue; }
+    const u: { cellIdx: number; widthDelta?: number; heightDelta?: number } = { cellIdx: b.cellIdx };
+    if (newCols) {
+      let target = 0;
+      for (let c = b.col; c < Math.min(d.cols, b.col + Math.max(1, b.colSpan)); c += 1) target += newCols[c]!;
+      const dw = Math.round(target) - p.width;
+      if (dw !== 0) u.widthDelta = dw;
+    }
+    if (newRows) {
+      const span = Array.from({ length: Math.max(1, b.rowSpan) }, (_, i) => b.row + i).filter((x) => x < d.rows);
+      if (span.some((x) => newRows.has(x))) {
+        const target = span.reduce((a, x) => a + (newRows.get(x) ?? laid[x] ?? 0), 0);
+        const dh = Math.round(target) - p.height;
+        if (dh !== 0) u.heightDelta = dh;
+      }
+    }
+    if (u.widthDelta !== undefined || u.heightDelta !== undefined) updates.push(u);
+  }
+  if (!updates.length) return false;
+  w.resizeTableCells(ref.sec, ref.ppi, ref.ci, updates);
+  return true;
+}
+
+const widthsOf = (w: WasmBridge, ref: EmbedTableRefV1, cols: number) =>
+  columnWidths(dedupe(cellsOf(w, ref)), cols, (b) => { try { return w.getCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx).width; } catch { return b.w * HWP_PER_PX; } });
+
+/** 표 너비를 `before`(HWPUNIT)로 되돌린다 — 모든 열을 같은 비율로 */
+function keepWidth(w: WasmBridge, ref: EmbedTableRefV1, before: number): void {
+  const d = dims(w, ref);
+  if (!d || before <= 0) return;
+  const cols = widthsOf(w, ref, d.cols);
+  const now = cols.reduce((a, b) => a + b, 0);
+  if (now <= 0 || Math.abs(now - before) < 1) return;
+  const k = before / now;
+  applySizes(w, ref, cols.map((x) => x * k), null);
+}
+
+export type EmbedResizeModeV1 = 'share' | 'left' | 'ratio';
+/**
+ * 열 경계 `line` 을 `deltaHwp` 만큼 옮긴 뒤의 열 너비(lily-docs 경계 끌기와 같은 셋): share = 오른쪽 이웃이 메운다(표 너비 그대로),
+ * left = 왼쪽 열만(표 너비가 바뀐다 — 오른쪽 끝 경계는 늘 이것), ratio = 오른쪽 열들이 비율대로(표 너비 그대로). 하한 = MIN_COL_HWP.
+ */
+export function resizedColumns(cols: readonly number[], line: number, deltaHwp: number, mode: EmbedResizeModeV1): number[] | null {
+  const n = cols.length;
+  if (line < 1 || line > n) return null;
+  const out = [...cols];
+  const m = line === n ? 'left' : mode;
+  const left = cols[line - 1]!;
+  let d = Math.max(deltaHwp, MIN_COL_HWP - left);
+  if (m === 'share') {
+    d = Math.min(d, cols[line]! - MIN_COL_HWP);
+    out[line - 1] = left + d;
+    out[line] = cols[line]! - d;
+  } else if (m === 'ratio') {
+    const rest = cols.slice(line).reduce((a, b) => a + b, 0);
+    const narrow = Math.min(...cols.slice(line));
+    d = Math.min(d, rest * (1 - MIN_COL_HWP / narrow));
+    out[line - 1] = left + d;
+    const f = (rest - d) / rest;
+    for (let c = line; c < n; c += 1) out[c] = cols[c]! * f;
+  } else {
+    out[line - 1] = left + d;
+  }
+  return out;
+}
+
+export interface EmbedResizeLineV1 extends EmbedTableRefV1 { axis: 'row' | 'col'; line: number; deltaPx: number; mode: EmbedResizeModeV1 }
+export function parseResizeLine(p: Record<string, unknown>): EmbedResizeLineV1 {
+  const mode = p.mode ?? 'share';
+  if (mode !== 'share' && mode !== 'left' && mode !== 'ratio') throw new Error('mode must be share, left or ratio');
+  return { ...parseTableRef(p), axis: axisOf(p.axis), line: int(p.line, 'line', 0, 65535), deltaPx: num(p.deltaPx, 'deltaPx'), mode };
+}
+
+/** 경계 끌기: 열 경계 `line`(1 = 첫 열 오른쪽) · 행 `line` 의 아래 경계를 `deltaPx`(쪽 px)만큼 — 실행 취소 한 단계 */
+export function tableResizeLine(ih: InputHandler, req: EmbedResizeLineV1): { ok: boolean } {
+  let ok = false;
+  if (ih.isInCellSelectionMode()) ih.exitCellSelectionMode();
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: 'resizeTableCells',
+    operation: (w) => {
+      const d = dims(w, req);
+      if (!d) return null;
+      const delta = req.deltaPx * HWP_PER_PX;
+      if (req.axis === 'col') {
+        const next = resizedColumns(widthsOf(w, req, d.cols), req.line, delta, req.mode);
+        ok = !!next && applySizes(w, req, next, null);
+      } else {
+        if (req.line >= d.rows) return null;
+        const laid = laidRowHeights(cellsOf(w, req), d.rows);
+        ok = applySizes(w, req, null, new Map([[req.line, Math.max(MIN_ROW_HWP, laid[req.line]! * HWP_PER_PX + delta)]]));
+      }
+      return ok ? ih.getCursorPosition() : null;
+    },
+  });
+  return { ok };
+}
+
+export interface EmbedResizeTableV1 extends EmbedTableRefV1 { page: number; widthPx: number; heightPx: number }
+export function parseResizeTable(p: Record<string, unknown>): EmbedResizeTableV1 {
+  const widthPx = num(p.widthPx, 'widthPx');
+  const heightPx = num(p.heightPx, 'heightPx');
+  if (widthPx <= 0 || heightPx <= 0) throw new Error('widthPx and heightPx must be positive');
+  return { ...parseTableRef(p), page: int(p.page, 'page'), widthPx, heightPx };
+}
+
+/** 표 크기: 쪽 `page` 에 그려진 조각이 widthPx × heightPx 가 되게 — 모든 열 너비 · 그 쪽의 행 높이가 비율대로(실행 취소 한 단계) */
+export function tableResize(ih: InputHandler, req: EmbedResizeTableV1): { ok: boolean } {
+  let ok = false;
+  if (ih.isInCellSelectionMode()) ih.exitCellSelectionMode();
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: 'resizeTableCells',
+    operation: (w) => {
+      const d = dims(w, req);
+      const all = cellsOf(w, req);
+      const g = gridOfCells(all.filter((b) => b.pageIndex === req.page), d?.cols ?? 0);
+      if (!d || !g) return null;
+      const [kx, ky] = [req.widthPx / Math.max(1, g.right - g.left), req.heightPx / Math.max(1, g.bottom - g.top)];
+      const cols = widthsOf(w, req, d.cols).map((x) => Math.max(MIN_COL_HWP, x * kx));
+      const laid = laidRowHeights(all, d.rows);
+      const rows = new Map(g.rowBands.map((b) => [b.row, Math.max(MIN_ROW_HWP, laid[b.row]! * HWP_PER_PX * ky)] as [number, number]));
+      ok = applySizes(w, req, Math.abs(kx - 1) > 1e-4 ? cols : null, Math.abs(ky - 1) > 1e-4 ? rows : null);
+      return ok ? ih.getCursorPosition() : null;
+    },
+  });
+  return { ok };
+}
+
+export interface EmbedSetCountV1 extends EmbedTableRefV1 { axis: 'row' | 'col'; n: number }
+export const MAX_COUNT = { row: 999, col: 63 } as const;
+export function parseSetCount(p: Record<string, unknown>): EmbedSetCountV1 {
+  const axis = axisOf(p.axis);
+  return { ...parseTableRef(p), axis, n: int(p.n, 'n', 1, MAX_COUNT[axis]) };
+}
+
+/** 열 수 · 행 수 칸: 끝에서 넣고 빼서 n 개로(끝 줄에 글이 있어도 뺀다 — 되돌리기로 살린다). 열은 표 너비 그대로. 실행 취소 한 단계 */
+export function tableSetCount(ih: InputHandler, wasm: WasmBridge, req: EmbedSetCountV1): { ok: boolean; rects?: EmbedPageRectV1[] } {
+  const d = dims(wasm, req);
+  if (!d) return { ok: false };
+  const from = req.axis === 'row' ? d.rows : d.cols;
+  if (req.n === from) return { ok: true, rects: [] };
+  const caret = ih.getCursorPosition();
+  const caretCell = dedupe(cellsOf(wasm, req)).find((b) => caret.parentParaIndex === req.ppi && caret.controlIndex === req.ci && b.cellIdx === caret.cellIndex);
+  if (ih.isInCellSelectionMode()) ih.exitCellSelectionMode();
+  let ok = false;
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: req.n > from ? (req.axis === 'row' ? 'insertTableRow' : 'insertTableColumn') : (req.axis === 'row' ? 'deleteTableRow' : 'deleteTableColumn'),
+    operation: (w) => {
+      const before = req.axis === 'col' ? widthsOf(w, req, d.cols).reduce((a, b) => a + b, 0) : 0;
+      for (let k = from; k < req.n; k += 1) {
+        if (req.axis === 'row') w.insertTableRow(req.sec, req.ppi, req.ci, k - 1, true);
+        else w.insertTableColumn(req.sec, req.ppi, req.ci, k - 1, true);
+      }
+      for (let k = from - 1; k >= req.n; k -= 1) {
+        if (req.axis === 'row') w.deleteTableRow(req.sec, req.ppi, req.ci, k);
+        else w.deleteTableColumn(req.sec, req.ppi, req.ci, k);
+      }
+      if (req.axis === 'col') keepWidth(w, req, before);
+      ok = true;
+      const nd = dims(w, req);
+      const cells = cellsOf(w, req);
+      const row = Math.min(caretCell?.row ?? 0, (nd?.rows ?? 1) - 1);
+      const col = Math.min(caretCell?.col ?? 0, (nd?.cols ?? 1) - 1);
+      const at = cellAt(cells, row, col);
+      return at ? cellPos(req, at.cellIdx) : ih.getCursorPosition();
+    },
+  });
+  // 포커스는 호스트 몫 — 수 칸(▴▾ · 숫자 칸)에 남아야 이어서 고친다(lily-docs 와 같다)
+  if (!ok) return { ok: false };
+  return { ok: true, rects: req.n > from ? bandRectsOf(cellsOf(wasm, req), req.axis, from, req.n - 1) : [] };
+}
+
+/** 투명 선 보기 — 호스트가 한 번 정하면 다음에 여는 문서에도(문서마다 엔진 값이 처음으로 돌아간다) */
+let gridlinesPref: boolean | null = null;
+export const gridlinesPreference = (): boolean | null => gridlinesPref;
+export function parseGridlines(p: Record<string, unknown>): { on: boolean } {
+  if (typeof p.on !== 'boolean') throw new Error('on must be true or false');
+  return { on: p.on };
+}
+export function tableSetGridlines(wasm: WasmBridge, req: { on: boolean }, repaint: () => void): { ok: boolean } {
+  gridlinesPref = req.on;
+  if (wasm.pageCount === 0) return { ok: true };
+  try { wasm.setShowTransparentBorders(req.on); } catch { return { ok: false }; }
+  repaint();
+  return { ok: true };
+}
+
+export interface EmbedCellSizeV1 { rowHeightMm?: number; colWidthMm?: number }
+export function parseCellSize(p: Record<string, unknown>): EmbedCellSizeV1 {
+  const out: EmbedCellSizeV1 = {};
+  for (const k of ['rowHeightMm', 'colWidthMm'] as const) {
+    if (p[k] === undefined) continue;
+    const v = num(p[k], k);
+    if (v < 0.5 || v > 2000) throw new Error(`${k} must be from 0.5 to 2000`);
+    out[k] = v;
+  }
+  if (out.rowHeightMm === undefined && out.colWidthMm === undefined) throw new Error('rowHeightMm or colWidthMm is required');
+  return out;
+}
+/** 고른 줄(없으면 캐럿 칸의 줄)의 행 높이 · 열 너비(mm) — 실행 취소 한 단계. 열 너비를 바꾸면 표 너비가 바뀐다 */
+export function tableSetCellSize(ih: InputHandler, wasm: WasmBridge, req: EmbedCellSizeV1): { ok: boolean } {
+  const cur = currentTable(ih);
+  if (!cur) return { ok: false };
+  const { ref } = cur;
+  const d = dims(wasm, ref);
+  const r = cur.object && d ? { r0: 0, c0: 0, r1: d.rows - 1, c1: d.cols - 1 } : currentRange(ih, cellsOf(wasm, ref));
+  if (!d || !r) return { ok: false };
+  let ok = false;
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: 'resizeTableCells',
+    operation: (w) => {
+      const cols = req.colWidthMm !== undefined ? widthsOf(w, ref, d.cols).map((x, c) => (c >= r.c0 && c <= r.c1 ? hwpOfMm(req.colWidthMm!) : x)) : null;
+      const rows = req.rowHeightMm !== undefined ? new Map(Array.from({ length: r.r1 - r.r0 + 1 }, (_, i) => [r.r0 + i, hwpOfMm(req.rowHeightMm!)] as [number, number])) : null;
+      ok = applySizes(w, ref, cols, rows);
+      return ih.getCursorPosition();
+    },
+  });
+  return { ok };
+}
+
+export interface EmbedPaddingV1 { top?: number; bottom?: number; left?: number; right?: number }
+export function parsePadding(p: Record<string, unknown>): EmbedPaddingV1 {
+  const out: EmbedPaddingV1 = {};
+  for (const k of ['top', 'bottom', 'left', 'right'] as const) {
+    if (p[k] === undefined) continue;
+    const v = num(p[k], k);
+    if (v < 0 || v > 100) throw new Error(`${k} must be from 0 to 100`);
+    out[k] = v;
+  }
+  if (!Object.keys(out).length) throw new Error('one of top, bottom, left, right is required');
+  return out;
+}
+/** 표 안 여백(mm): 표 속성 + 모든 칸(표 만들기가 둘을 같은 값으로 두는 것과 같게) — 실행 취소 한 단계 */
+export function tableSetPadding(ih: InputHandler, req: EmbedPaddingV1): { ok: boolean } {
+  const cur = currentTable(ih);
+  if (!cur) return { ok: false };
+  const { ref } = cur;
+  const props: Record<string, number> = {};
+  if (req.top !== undefined) props.paddingTop = hwpOfMm(req.top);
+  if (req.bottom !== undefined) props.paddingBottom = hwpOfMm(req.bottom);
+  if (req.left !== undefined) props.paddingLeft = hwpOfMm(req.left);
+  if (req.right !== undefined) props.paddingRight = hwpOfMm(req.right);
+  let ok = false;
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: 'tableProps',
+    operation: (w) => {
+      w.runInBatch(() => {
+        w.setTableProperties(ref.sec, ref.ppi, ref.ci, props);
+        for (const b of dedupe(cellsOf(w, ref))) w.setCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx, props);
+      });
+      ok = true;
+      return ih.getCursorPosition();
+    },
+  });
+  return { ok };
+}
+
+export function parseTextDirection(p: Record<string, unknown>): { dir: 'horizontal' | 'vertical' } {
+  if (p.dir !== 'horizontal' && p.dir !== 'vertical') throw new Error('dir must be horizontal or vertical');
+  return { dir: p.dir };
+}
+/** 글 방향(가로 · 세로) — 고른 칸 모두, 실행 취소 한 단계 */
+export function tableSetTextDirection(ih: InputHandler, wasm: WasmBridge, req: { dir: 'horizontal' | 'vertical' }): { ok: boolean } {
+  return eachCell(ih, wasm, 'cellProps', (w, ref, b) => { w.setCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx, { textDirection: req.dir === 'vertical' ? 1 : 0 }); });
+}
+
+export interface EmbedSplitCellsV1 { rows: number; cols: number; mergeFirst: boolean }
+export function parseSplitCells(p: Record<string, unknown>): EmbedSplitCellsV1 {
+  if (typeof p.mergeFirst !== 'boolean') throw new Error('mergeFirst must be true or false');
+  return { rows: int(p.rows, 'rows', 1, 63), cols: int(p.cols, 'cols', 1, 63), mergeFirst: p.mergeFirst };
+}
+/** 셀 나누기: 고른 칸(없으면 캐럿 칸)을 행 · 열 수로 — 먼저 합치기를 켜면 고른 범위를 한 칸으로 합친 뒤 나눈다. 실행 취소 한 단계 */
+export function tableSplitCells(ih: InputHandler, wasm: WasmBridge, req: EmbedSplitCellsV1): { ok: boolean } {
+  const cur = currentTable(ih);
+  if (!cur || cur.object) return { ok: false };
+  const { ref } = cur;
+  const r = currentRange(ih, cellsOf(wasm, ref));
+  if (!r) return { ok: false };
+  if (ih.isInCellSelectionMode()) ih.exitCellSelectionMode();
+  let ok = false;
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: 'splitTableCell',
+    operation: (w) => {
+      const many = r.r1 > r.r0 || r.c1 > r.c0;
+      if (many && req.mergeFirst) {
+        w.mergeTableCells(ref.sec, ref.ppi, ref.ci, r.r0, r.c0, r.r1, r.c1);
+        ok = w.splitTableCellInto(ref.sec, ref.ppi, ref.ci, r.r0, r.c0, req.rows, req.cols, true, false).ok;
+      } else if (many) {
+        ok = w.splitTableCellsInRange(ref.sec, ref.ppi, ref.ci, r.r0, r.c0, r.r1, r.c1, req.rows, req.cols, true).ok;
+      } else {
+        ok = w.splitTableCellInto(ref.sec, ref.ppi, ref.ci, r.r0, r.c0, req.rows, req.cols, true, false).ok;
+      }
+      const at = cellAt(cellsOf(w, ref), r.r0, r.c0);
+      return at ? cellPos(ref, at.cellIdx) : ih.getCursorPosition();
+    },
+  });
+  ih.focus();
+  return { ok };
+}
+
+/** 새 표의 꼴(LilyOffice 에이치독스 table-ui/defaults.ts 와 같은 값) — 원래대로 */
+const RESET_LINE = { type: 1, width: 1, color: '#000000' };
+const RESET_HEADER_FILL = '#f2f2f2';
+const RESET_SIZE = 1100; // 11pt
+/**
+ * 표 꾸밈을 새 표처럼(lily-docs 표 스타일 원래대로와 같은 일): 칸 바탕 없앰 · 제목 줄이면 첫 행 옅은 회색 + 굵게, 모든 테두리 = 실선 0.12mm 검정,
+ * 글자 = 11pt · 검정 · 굵게 · 기울임 · 밑줄 · 취소선 없음(제목 행은 굵게). 글꼴 · 문단 모양 · 칸 크기는 그대로. 실행 취소 한 단계
+ */
+export function tableResetStyle(ih: InputHandler): { ok: boolean } {
+  const cur = currentTable(ih);
+  if (!cur) return { ok: false };
+  const { ref } = cur;
+  let ok = false;
+  ih.executeOperation({
+    kind: 'snapshot',
+    operationType: 'cellBorderFill',
+    operation: (w) => {
+      let header = false;
+      try { header = !!w.getTableProperties(ref.sec, ref.ppi, ref.ci).repeatHeader; } catch { /* 모름 */ }
+      w.runInBatch(() => {
+        for (const b of dedupe(cellsOf(w, ref))) {
+          const head = header && b.row === 0;
+          w.setCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx, {
+            ...(head ? { fillType: 'solid', fillColor: RESET_HEADER_FILL } : { fillType: 'none' }),
+            borderLeft: RESET_LINE, borderRight: RESET_LINE, borderTop: RESET_LINE, borderBottom: RESET_LINE,
+          } as never);
+          let n = 1;
+          try { n = w.getCellParagraphCount(ref.sec, ref.ppi, ref.ci, b.cellIdx); } catch { n = 1; }
+          for (let p = 0; p < n; p += 1) {
+            let len = 0;
+            try { len = w.getCellParagraphLength(ref.sec, ref.ppi, ref.ci, b.cellIdx, p); } catch { len = 0; }
+            w.applyCharFormatInCell(ref.sec, ref.ppi, ref.ci, b.cellIdx, p, 0, len, JSON.stringify({
+              fontSize: RESET_SIZE, bold: head, italic: false, underline: false, strikethrough: false, textColor: '#000000',
+            }));
+          }
+        }
+      });
+      ok = true;
+      return ih.getCursorPosition();
+    },
+  });
+  return { ok };
 }
 
 export function tableBandRects(wasm: WasmBridge, req: EmbedTableRefV1 & { axis: 'row' | 'col'; from: number; to: number }): EmbedPageRectV1[] {
@@ -542,8 +1048,11 @@ export function tableDeleteLines(ih: InputHandler, wasm: WasmBridge, req: { what
         ok = true;
         return { sectionIndex: ref.sec, paragraphIndex: ref.ppi, charOffset: 0 };
       }
+      // [lily 2] 열을 지워도 표 너비는 그대로(lily-docs 와 같다) — 남은 열을 비율대로 넓힌다
+      const before = req.what === 'cols' ? widthsOf(w, ref, d.cols).reduce((a, b) => a + b, 0) : 0;
       if (req.what === 'rows') for (let i = r.r1; i >= r.r0; i -= 1) w.deleteTableRow(ref.sec, ref.ppi, ref.ci, i);
       else for (let i = r.c1; i >= r.c0; i -= 1) w.deleteTableColumn(ref.sec, ref.ppi, ref.ci, i);
+      if (req.what === 'cols') keepWidth(w, ref, before);
       ok = true;
       const nd = dims(w, ref);
       const cells = cellsOf(w, ref);
@@ -633,14 +1142,23 @@ export function tableSetBorders(ih: InputHandler, wasm: WasmBridge, req: EmbedSe
       const on = req.kind === 'none' ? false : req.on ?? true;
       for (const s of sidesFor(req.kind, b, r)) next[SIDE_KEY[s]] = on ? pen(cur(s)) : { type: 0, width: cur(s).width, color: cur(s).color };
     }
+    // [lily 2] 테두리만 바꿔도 칸 바탕이 남게 — 칸 속성은 테두리와 바탕을 한 borderFill 로 다시 만든다(빠진 바탕 = 없음)
+    for (const k of ['fillType', 'fillColor', 'patternColor', 'patternType'] as const) if (p[k] !== undefined) (next as Record<string, unknown>)[k] = p[k];
     w.setCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx, next as never);
   });
 }
 
-/** 셀 세로 맞춤(가로 맞춤은 문단 모양 — format.setPara 가 셀 블록에 듣는다) */
-export function tableSetCellAlign(ih: InputHandler, wasm: WasmBridge, req: { v: 'top' | 'center' | 'bottom' }): { ok: boolean } {
-  const va = V_ALIGN.indexOf(req.v);
-  return eachCell(ih, wasm, 'cellProps', (w, ref, b) => { w.setCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx, { verticalAlign: va }); });
+/** 셀 세로 맞춤 · [lily 2] 가로 맞춤(칸 안 문단 모두 — 세로와 같이 주면 한 단계) */
+export function tableSetCellAlign(ih: InputHandler, wasm: WasmBridge, req: { v?: 'top' | 'center' | 'bottom'; h?: EmbedCellHAlignV1 }): { ok: boolean } {
+  const va = req.v ? V_ALIGN.indexOf(req.v) : -1;
+  return eachCell(ih, wasm, 'cellProps', (w, ref, b) => {
+    if (va >= 0) w.setCellProperties(ref.sec, ref.ppi, ref.ci, b.cellIdx, { verticalAlign: va });
+    if (req.h) {
+      let n = 1;
+      try { n = w.getCellParagraphCount(ref.sec, ref.ppi, ref.ci, b.cellIdx); } catch { n = 1; }
+      for (let p = 0; p < n; p += 1) w.applyParaFormatInCell(ref.sec, ref.ppi, ref.ci, b.cellIdx, p, JSON.stringify({ alignment: req.h }));
+    }
+  });
 }
 
 /** 제목 줄: 첫 행 칸을 제목 칸으로 + 표의 제목 줄 자동 반복(표 › 셀 속성 대화 상자의 두 칸) */

@@ -28,7 +28,9 @@ import { parseMemoEdit, parseMemoInsert, type EmbedMemoEditV1, type EmbedMemoIns
 import { parseFieldInsert, parseFieldSet, type EmbedFieldInsertV1, type EmbedFieldSetV1, type EmbedFieldV1 } from './field-ops.ts';
 import {
   parseBandRects, parseCellAlign, parseDeleteLines, parseGridAt, parseHeaderRow, parseInsertAt, parseMove, parseSelect, parseSetBorders,
-  type EmbedPageRectV1, type EmbedSetBordersV1, type EmbedTableGridV1, type EmbedTableRefV1, type EmbedTableStateV1,
+  parseCellSize, parseGridlines, parsePadding, parseResizeLine, parseResizeTable, parseSetCount, parseSplitCells, parseTextDirection,
+  type EmbedCellHAlignV1, type EmbedCellSizeV1, type EmbedPaddingV1, type EmbedPageRectV1, type EmbedResizeLineV1, type EmbedResizeTableV1, type EmbedSetBordersV1,
+  type EmbedSetCountV1, type EmbedSplitCellsV1, type EmbedTableGridV1, type EmbedTableRefV1, type EmbedTableStateV1,
 } from './table-ui-ops.ts';
 import { parseCellFill, parseTableInsert, type EmbedCellFillStateV1, type EmbedCellFillV1, type EmbedTableInsertResultV1, type EmbedTableInsertV1 } from './table-ops.ts';
 import { parseChartInsert, parseChartReplace, type EmbedChartInsertV1, type EmbedChartReplaceV1, type EmbedChartSelectedV1 } from './chart-ops.ts';
@@ -157,8 +159,18 @@ export interface EmbedRpcHandlers {
   tableDeleteLines(req: { what: 'rows' | 'cols' | 'table' }): Promise<{ ok: boolean }>;
   tableMove(req: EmbedTableRefV1 & { axis: 'row' | 'col'; from: number; line: number }): Promise<{ ok: boolean; index?: number; rects?: EmbedPageRectV1[]; reason?: string }>;
   tableSetBorders(req: EmbedSetBordersV1): Promise<{ ok: boolean }>;
-  tableSetCellAlign(req: { v: 'top' | 'center' | 'bottom' }): Promise<{ ok: boolean }>;
+  tableSetCellAlign(req: { v?: 'top' | 'center' | 'bottom'; h?: EmbedCellHAlignV1 }): Promise<{ ok: boolean }>;
   tableSetHeaderRow(req: { on: boolean }): Promise<{ ok: boolean }>;
+  /** [lily 2] 열 수 · 행 수 · 경계 끌기 · 표 크기 · 투명 선 · 셀 크기 · 표 안 여백 · 글 방향 · 셀 나누기 · 원래대로 */
+  tableSetCount(req: EmbedSetCountV1): Promise<{ ok: boolean; rects?: EmbedPageRectV1[] }>;
+  tableResizeLine(req: EmbedResizeLineV1): Promise<{ ok: boolean }>;
+  tableResize(req: EmbedResizeTableV1): Promise<{ ok: boolean }>;
+  tableSetGridlines(req: { on: boolean }): Promise<{ ok: boolean }>;
+  tableSetCellSize(req: EmbedCellSizeV1): Promise<{ ok: boolean }>;
+  tableSetPadding(req: EmbedPaddingV1): Promise<{ ok: boolean }>;
+  tableSetTextDirection(req: { dir: 'horizontal' | 'vertical' }): Promise<{ ok: boolean }>;
+  tableSplitCells(req: EmbedSplitCellsV1): Promise<{ ok: boolean }>;
+  tableResetStyle(): Promise<{ ok: boolean }>;
   shapeInsert(req: EmbedShapeInsertV1): Promise<EmbedPageOpResultV1>;
   /** [lily] 차트(그림 + 설명에 실은 정의) 넣기 · 고른 차트 읽기 · 바꾸기 */
   pictureInsert(req: EmbedPictureInsertV1): Promise<EmbedPictureInsertResultV1>;
@@ -481,11 +493,38 @@ export async function routeEmbedRequest(
       assertOnlyKeys(params, ['kind', 'on', 'style', 'widthPt', 'color'], 'table.setBorders params');
       return handlers.tableSetBorders(parseSetBorders(params));
     case 'table.setCellAlign':
-      assertOnlyKeys(params, ['v'], 'table.setCellAlign params');
+      assertOnlyKeys(params, ['v', 'h'], 'table.setCellAlign params');
       return handlers.tableSetCellAlign(parseCellAlign(params));
     case 'table.setHeaderRow':
       assertOnlyKeys(params, ['on'], 'table.setHeaderRow params');
       return handlers.tableSetHeaderRow(parseHeaderRow(params));
+    case 'table.setCount':
+      assertOnlyKeys(params, ['sec', 'ppi', 'ci', 'axis', 'n'], 'table.setCount params');
+      return handlers.tableSetCount(parseSetCount(params));
+    case 'table.resizeLine':
+      assertOnlyKeys(params, ['sec', 'ppi', 'ci', 'axis', 'line', 'deltaPx', 'mode'], 'table.resizeLine params');
+      return handlers.tableResizeLine(parseResizeLine(params));
+    case 'table.resize':
+      assertOnlyKeys(params, ['sec', 'ppi', 'ci', 'page', 'widthPx', 'heightPx'], 'table.resize params');
+      return handlers.tableResize(parseResizeTable(params));
+    case 'table.setGridlines':
+      assertOnlyKeys(params, ['on'], 'table.setGridlines params');
+      return handlers.tableSetGridlines(parseGridlines(params));
+    case 'table.setCellSize':
+      assertOnlyKeys(params, ['rowHeightMm', 'colWidthMm'], 'table.setCellSize params');
+      return handlers.tableSetCellSize(parseCellSize(params));
+    case 'table.setPadding':
+      assertOnlyKeys(params, ['top', 'bottom', 'left', 'right'], 'table.setPadding params');
+      return handlers.tableSetPadding(parsePadding(params));
+    case 'table.setTextDirection':
+      assertOnlyKeys(params, ['dir'], 'table.setTextDirection params');
+      return handlers.tableSetTextDirection(parseTextDirection(params));
+    case 'table.splitCells':
+      assertOnlyKeys(params, ['rows', 'cols', 'mergeFirst'], 'table.splitCells params');
+      return handlers.tableSplitCells(parseSplitCells(params));
+    case 'table.resetStyle':
+      assertOnlyKeys(params, [], 'table.resetStyle params');
+      return handlers.tableResetStyle();
     case 'page.setFill':
       assertOnlyKeys(params, ['color'], 'page.setFill params');
       return handlers.pageSetFill(parsePageFill(params));

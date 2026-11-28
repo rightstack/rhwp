@@ -614,6 +614,16 @@ export class RhwpEditor {
       setBorders: (req) => this._request('table.setBorders', req),
       setCellAlign: (req) => this._request('table.setCellAlign', req),
       setHeaderRow: (req) => this._request('table.setHeaderRow', req),
+      // [lily 2] 머리 띠 수 칸 · 경계 끌기 · 표 크기 · 투명 선 · 레이아웃 갈래(셀 크기 · 표 안 여백 · 글 방향 · 셀 나누기 · 원래대로)
+      setCount: (req) => this._request('table.setCount', req),
+      resizeLine: (req) => this._request('table.resizeLine', req),
+      resize: (req) => this._request('table.resize', req),
+      setGridlines: (req) => this._request('table.setGridlines', req),
+      setCellSize: (req) => this._request('table.setCellSize', req),
+      setPadding: (req) => this._request('table.setPadding', req),
+      setTextDirection: (req) => this._request('table.setTextDirection', req),
+      splitCells: (req) => this._request('table.splitCells', req),
+      resetStyle: () => this._request('table.resetStyle', {}),
     };
   }
 
