@@ -772,8 +772,7 @@ pub(crate) fn render_transparent_borders(
 ) -> Vec<RenderNode> {
     let mut nodes = Vec::new();
     let color: u32 = 0xDDB99D; // BGR: #9DB9DD ([lily] 옅은 파랑 — upstream 은 0x0000FF 빨강)
-    let width = 0.75_f64; // [lily] ≈ 0.5pt(upstream 0.4px)
-    let dash = StrokeDash::Dot;
+    let width = 1.0_f64; // [lily] 1px 점(upstream 0.4px 점선)
     let row_count = if row_y.len() > 1 { row_y.len() - 1 } else { 0 };
     let is_h_covered = |ri: usize, ci: usize| -> bool {
         h_covered
@@ -803,8 +802,7 @@ pub(crate) fn render_transparent_borders(
             } else if let Some(start) = seg_start {
                 let x1 = table_x + ref_cx[start];
                 let x2 = table_x + ref_cx[ci];
-                nodes.extend(create_editor_only_line(
-                    tree, color, width, dash, x1, y, x2, y,
+                nodes.extend(transparent_dots(tree, color, width, x1, y, x2, y,
                 ));
                 seg_start = None;
             }
@@ -812,8 +810,7 @@ pub(crate) fn render_transparent_borders(
         if let Some(start) = seg_start {
             let x1 = table_x + ref_cx[start];
             let x2 = table_x + ref_cx.get(h_row.len()).copied().unwrap_or(ref_cx[start]);
-            nodes.extend(create_editor_only_line(
-                tree, color, width, dash, x1, y, x2, y,
+            nodes.extend(transparent_dots(tree, color, width, x1, y, x2, y,
             ));
         }
     }
@@ -837,8 +834,7 @@ pub(crate) fn render_transparent_borders(
                     // x가 바뀌면 이전 세그먼트 마무리 후 새 세그먼트 시작
                     let y1 = table_y + row_y[seg_start.unwrap()];
                     let y2 = table_y + row_y[ri];
-                    nodes.extend(create_editor_only_line(
-                        tree, color, width, dash, seg_x, y1, seg_x, y2,
+                    nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2,
                     ));
                     seg_start = Some(ri);
                     seg_x = x;
@@ -846,8 +842,7 @@ pub(crate) fn render_transparent_borders(
             } else if let Some(start) = seg_start {
                 let y1 = table_y + row_y[start];
                 let y2 = table_y + row_y[ri];
-                nodes.extend(create_editor_only_line(
-                    tree, color, width, dash, seg_x, y1, seg_x, y2,
+                nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2,
                 ));
                 seg_start = None;
             }
@@ -855,13 +850,45 @@ pub(crate) fn render_transparent_borders(
         if let Some(start) = seg_start {
             let y1 = table_y + row_y[start];
             let y2 = table_y + row_y.get(v_col.len()).copied().unwrap_or(row_y[start]);
-            nodes.extend(create_editor_only_line(
-                tree, color, width, dash, seg_x, y1, seg_x, y2,
+            nodes.extend(transparent_dots(tree, color, width, seg_x, y1, seg_x, y2,
             ));
         }
     }
 
     nodes
+}
+
+/// [lily] 투명 테두리 한 조각을 점으로: 1px 점 · 2px 틈(쪽 px, 쪽 원점부터 같은 주기 — 이웃 조각 · 교차에서 어긋나지 않는다).
+/// LilyOffice lily-docs 표 눈금선(`gridlines.rs` — 1 CSS px 점 · 2px 틈)과 같은 꼴. 그리는 쪽의 Dot 꼴(2px · 2px)은 짧은 파선으로 보였다.
+/// 점이 너무 많으면(아주 긴 선) 그리는 쪽 Dot 선 하나로 그린다.
+fn transparent_dots(
+    tree: &mut PageLayoutContext,
+    color: u32,
+    width: f64,
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+) -> Vec<RenderNode> {
+    const DOT: f64 = 1.0;
+    const PERIOD: f64 = 3.0;
+    const MAX_DOTS: f64 = 2000.0;
+    let horiz = (y1 - y2).abs() < 0.01;
+    let (lo, hi) = if horiz { (x1.min(x2), x1.max(x2)) } else { (y1.min(y2), y1.max(y2)) };
+    if !(lo.is_finite() && hi.is_finite()) || (hi - lo) / PERIOD > MAX_DOTS {
+        return create_editor_only_line(tree, color, width, StrokeDash::Dot, x1, y1, x2, y2);
+    }
+    let mut out = Vec::new();
+    let mut p = (lo / PERIOD).ceil() * PERIOD;
+    while p + DOT <= hi + 0.01 {
+        out.extend(if horiz {
+            create_editor_only_line(tree, color, width, StrokeDash::Solid, p, y1, p + DOT, y1)
+        } else {
+            create_editor_only_line(tree, color, width, StrokeDash::Solid, x1, p, x1, p + DOT)
+        });
+        p += PERIOD;
+    }
+    out
 }
 
 /// 테두리선 Line 노드 생성 (이중선/삼중선 지원)
