@@ -38,6 +38,9 @@ export interface EmbedTableGridV1 {
   cellCol: number;
   colLines: number[];
   rowBands: { row: number; top: number; bottom: number }[];
+  /** [lily 2] colLines[i] 가 칸 경계로 그려진 [위, 아래] 구간 · rowBands[i] 아래 경계가 그려진 [왼쪽, 오른쪽] 구간(합친 칸 안은 빠진다) */
+  colSpans?: [number, number][][];
+  rowSpans?: [number, number][][];
   /** 첫 행이 이 쪽에 있다 */
   first: boolean;
   /** [lily 2] 본문 상자 왼쪽 · 오른쪽(쪽 여백선, px) — 캐럿 없는 표의 경계 끌기 맞춤선 */
@@ -101,6 +104,9 @@ export interface EmbedTablePageGridV1 {
   bottom: number;
   colLines: number[];
   rowBands: { row: number; top: number; bottom: number }[];
+  /** EmbedTableGridV1 과 같음 */
+  colSpans?: [number, number][][];
+  rowSpans?: [number, number][][];
   /** 첫 행 · 마지막 행이 이 쪽에 있다 */
   first: boolean;
   last: boolean;
@@ -128,7 +134,7 @@ const overlaps = (b: CellBbox, r0: number, c0: number, r1: number, c1: number) =
   b.row <= r1 && spanEnd(b.row, b.rowSpan) >= r0 && b.col <= c1 && spanEnd(b.col, b.colSpan) >= c0;
 
 /** 한 쪽에 그려진 칸들 → 열 경계(열 + 1개) · 행 띠 · 바깥 틀 */
-export function gridOfCells(cells: readonly CellBbox[], cols: number): Pick<EmbedTableGridV1, 'left' | 'top' | 'right' | 'bottom' | 'colLines' | 'rowBands' | 'first'> | null {
+export function gridOfCells(cells: readonly CellBbox[], cols: number): Pick<EmbedTableGridV1, 'left' | 'top' | 'right' | 'bottom' | 'colLines' | 'rowBands' | 'first' | 'colSpans' | 'rowSpans'> | null {
   if (!cells.length) return null;
   const left = Math.min(...cells.map((b) => b.x));
   const top = Math.min(...cells.map((b) => b.y));
@@ -159,7 +165,30 @@ export function gridOfCells(cells: readonly CellBbox[], cols: number): Pick<Embe
     const rBottom = single.length ? Math.min(...single) : next ?? Math.max(...own.map((b) => b.y + b.h));
     return { row, top: rTop, bottom: rBottom };
   });
-  return { left, top, right, bottom, colLines: lines as number[], rowBands, first: rows[0] === 0 };
+  const colLines = lines as number[];
+  return { left, top, right, bottom, colLines, rowBands, first: rows[0] === 0, ...edgeSpans(cells, colLines, rowBands) };
+}
+
+/** [lily 2] 이어진 구간을 하나로 */
+function joinSpans(v: [number, number][]): [number, number][] {
+  v.sort((a, b) => a[0] - b[0]);
+  const out: [number, number][] = [];
+  for (const s of v) {
+    const l = out[out.length - 1];
+    if (l && s[0] <= l[1] + 0.5) l[1] = Math.max(l[1], s[1]);
+    else out.push([s[0], s[1]]);
+  }
+  return out;
+}
+
+/** [lily 2] 격자 선마다 실제로 그려진 구간 — 합친 칸이 덮은 조각은 빠진다(호스트 끌기 자리가 선이 없는 자리에 서지 않게) */
+export function edgeSpans(cells: readonly CellBbox[], colLines: number[], rowBands: { row: number; top: number; bottom: number }[]) {
+  const covers = (row: number, c: number) => cells.some((b) => b.row <= row && row <= spanEnd(b.row, b.rowSpan) && b.col < c && c <= spanEnd(b.col, b.colSpan));
+  const crosses = (row: number, j: number) => cells.some((b) => b.row <= row && row < spanEnd(b.row, b.rowSpan) && b.col <= j && j <= spanEnd(b.col, b.colSpan));
+  return {
+    colSpans: colLines.map((_, c) => joinSpans(rowBands.filter((b) => !covers(b.row, c)).map((b) => [b.top, b.bottom] as [number, number]))),
+    rowSpans: rowBands.map((b) => joinSpans(colLines.slice(0, -1).flatMap((x, j) => (crosses(b.row, j) ? [] : [[x, colLines[j + 1]!] as [number, number]])))),
+  };
 }
 
 /** 칸들 → 쪽별 바깥 틀 */

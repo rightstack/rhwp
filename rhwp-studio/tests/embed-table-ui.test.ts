@@ -66,6 +66,18 @@ test('[lily] 한 쪽 칸들 → 열 경계 · 행 띠 · 바깥 틀', () => {
     { cellIdx: 0, row: 0, col: 0, rowSpan: 1, colSpan: 3, pageIndex: 0, x: 0, y: 0, w: 300, h: 20 },
   ];
   assert.deepEqual(gridOfCells(merged, 3)!.colLines, [0, 100, 200, 300]);
+  // 선이 그려진 구간: 합치지 않은 표는 선마다 표 높이·폭 전체 한 구간
+  assert.deepEqual(g.colSpans, [[[40, 100]], [[40, 100]], [[40, 100]]]);
+  assert.deepEqual(g.rowSpans, [[[50, 250]], [[50, 250]], [[50, 250]]]);
+  // 가운데 행의 두 칸을 합치면 열 선 1 은 그 행에서 끊기고, 2행 2열 세로 합침은 행 선 0 의 오른쪽 칸을 끊는다
+  const m = cells(3, 2).filter((b) => !(b.row === 1 && b.col === 1) && !(b.row === 1 && b.col === 0)).filter((b) => !(b.row === 0 && b.col === 1));
+  m.push({ cellIdx: 90, row: 1, col: 0, rowSpan: 1, colSpan: 2, pageIndex: 0, x: 50, y: 60, w: 200, h: 20 });
+  m.push({ cellIdx: 91, row: 0, col: 1, rowSpan: 1, colSpan: 1, pageIndex: 0, x: 150, y: 40, w: 100, h: 20 });
+  const gm = gridOfCells(m, 2)!;
+  assert.deepEqual(gm.colSpans![1], [[40, 60], [80, 100]]);
+  const v = cells(3, 2).filter((b) => !(b.col === 1 && b.row < 2));
+  v.push({ cellIdx: 92, row: 0, col: 1, rowSpan: 2, colSpan: 1, pageIndex: 0, x: 150, y: 40, w: 100, h: 40 });
+  assert.deepEqual(gridOfCells(v, 2)!.rowSpans![0], [[50, 150]]);
 });
 
 test('[lily] 쪽별 틀 · 줄 사각형', () => {

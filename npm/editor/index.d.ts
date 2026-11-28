@@ -10,7 +10,7 @@ export interface RhwpTableGrid {
   ref: RhwpTableRef; page: number; pageWidth: number; rows: number; cols: number;
   left: number; top: number; right: number; bottom: number;
   cell: [number, number, number, number]; cellRow: number; cellCol: number;
-  colLines: number[]; rowBands: { row: number; top: number; bottom: number }[]; first: boolean;
+  colLines: number[]; rowBands: { row: number; top: number; bottom: number }[]; colSpans?: [number, number][][]; rowSpans?: [number, number][][]; first: boolean;
   /** [lily 2] 본문 상자 왼쪽 · 오른쪽(쪽 여백선, px) */
   bodyLeft?: number; bodyRight?: number;
 }
@@ -46,7 +46,7 @@ export interface RhwpTableStyle { card: RhwpTableStyleCard | null; look: RhwpTab
 /** [lily 2] 한 쪽에 그려진 표 조각(쪽 좌표) */
 export interface RhwpTablePageGrid {
   page: number; pageWidth: number; left: number; top: number; right: number; bottom: number;
-  colLines: number[]; rowBands: { row: number; top: number; bottom: number }[]; first: boolean; last: boolean; bodyLeft: number; bodyRight: number;
+  colLines: number[]; rowBands: { row: number; top: number; bottom: number }[]; colSpans?: [number, number][][]; rowSpans?: [number, number][][]; first: boolean; last: boolean; bodyLeft: number; bodyRight: number;
 }
 
 export interface EditorOptions {
